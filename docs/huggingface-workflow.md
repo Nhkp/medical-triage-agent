@@ -17,12 +17,15 @@ scripts must push checkpoints and final adapters to the Hub.
 Recommended smoke run:
 
 ```bash
-MAX_STEPS=5 uv run scripts/train_sft.py
-MAX_STEPS=5 uv run scripts/train_dpo.py
+uv run scripts/train_sft.py --config configs/sft_kaggle.yaml --max-steps 5 --dry-run
+uv run scripts/train_dpo.py --config configs/dpo_kaggle.yaml --max-steps 5 --dry-run
 ```
 
 For managed jobs, upload or inline the script, use `a10g-large` as the default Qwen3-1.7B
 LoRA development target, and set a timeout of at least two hours for non-smoke runs.
+
+For free-GPU execution, use `docs/kaggle-workflow.md`. Kaggle is the memory-constrained
+experimentation path; Hugging Face remains the dataset and adapter publication target.
 
 ## Local dataset commands
 

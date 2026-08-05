@@ -30,10 +30,11 @@ normalizes records into stable SFT and DPO JSONL schemas, applies lightweight PI
 creates deterministic train/validation/test/clinical-evaluation splits, and writes generated
 artifacts outside git.
 
-The model plan follows a staged alignment workflow: Qwen3-1.7B-Base is adapted with SFT and
-LoRA, then aligned with DPO preference data. Training scripts are present for smoke runs and
-later Hugging Face Hub publication, but full training artifacts are not claimed until run logs
-and model repositories exist.
+The model plan follows a staged alignment workflow: Qwen3-1.7B-Base is adapted with 4-bit
+QLoRA SFT, then aligned with DPO preference data. Kaggle free GPUs are the low-VRAM execution
+path for the first experiments, while Hugging Face remains the publication target for private
+datasets and LoRA adapters. Full training artifacts are not claimed until run logs and model
+repositories exist.
 
 Serving is designed around a vLLM OpenAI-compatible backend behind a thin FastAPI wrapper. The
 wrapper owns domain validation, safety disclaimers, metadata-only audit traces, and the stable
@@ -58,7 +59,8 @@ demo endpoint with audit metadata and safety evaluation.
   obvious PII findings for generated data.
 - The API scaffold exposes `/health`, `/triage`, and `/audit/{id}` with metadata-only audit
   responses and an optional vLLM-compatible client path.
-- SFT and DPO training scripts exist for small smoke runs before full GPU jobs.
+- SFT, DPO, and optional GRPO scripts have YAML configs and CPU-safe dry-run smoke commands
+  before full GPU jobs.
 
 ## Reproducibility
 
@@ -101,6 +103,15 @@ Run the local safety evaluation:
 uv run python -m medical_triage_agent evaluate-safety
 ```
 
+Validate Kaggle training and model-evaluation startup without loading weights:
+
+```bash
+make train-sft-smoke
+make train-dpo-smoke
+make train-grpo-smoke
+make eval-models
+```
+
 ## Limitations
 
 This repository does not contain private hospital data, clinician-validated CHSA triage labels,
@@ -130,4 +141,5 @@ uncertainty, escalation rules, and safety disclaimers.
 - [`docs/privacy-rgpd.md`](docs/privacy-rgpd.md): privacy and RGPD constraints.
 - [`docs/medical-safety.md`](docs/medical-safety.md): medical safety boundaries.
 - [`docs/evaluation.md`](docs/evaluation.md): evaluation policy and acceptance targets.
+- [`docs/kaggle-workflow.md`](docs/kaggle-workflow.md): free-GPU QLoRA workflow.
 - [`docs/report.md`](docs/report.md): longer technical report scaffold.

@@ -28,8 +28,20 @@ committed to git.
 
 ## Training
 
-TODO: run `MAX_STEPS=5` SFT/DPO smoke jobs after `HF_TOKEN`, `HF_DATASET_REPO`,
-`HF_DPO_DATASET_REPO`, `HF_SFT_MODEL_REPO`, and `HF_DPO_MODEL_REPO` are configured.
+Current status:
+
+- Kaggle-oriented QLoRA configuration exists for SFT, DPO, and optional GRPO.
+- Training scripts support CPU-safe dry runs, YAML configs, CLI overrides, adapter outputs,
+  and checkpoint resume arguments.
+- Full SFT/DPO runs remain TODO until generated data and GPU runtime are available.
+
+Smoke commands:
+
+```bash
+make train-sft-smoke
+make train-dpo-smoke
+make train-grpo-smoke
+```
 
 ## Evaluation
 
@@ -41,6 +53,12 @@ uv run python -m medical_triage_agent evaluate-safety
 
 TODO: add model-backed safety, hallucination, bilingual quality, latency, and traceability
 metrics after smoke training.
+
+Deterministic model-evaluation entrypoint:
+
+```bash
+make eval-models
+```
 
 ## Deployment
 
