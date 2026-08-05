@@ -1,0 +1,47 @@
+model:
+  name: "Qwen/Qwen3-1.7B-Base"
+  adapter_path: "outputs/sft"
+  revision: null
+  trust_remote_code: false
+  load_in_4bit: true
+
+data:
+  train_file: "data/processed/training/dpo_train.jsonl"
+  validation_file: "data/processed/training/dpo_validation.jsonl"
+  test_file: "data/processed/training/dpo_test.jsonl"
+  prompt_field: "prompt"
+  chosen_field: "chosen"
+  rejected_field: "rejected"
+  system_message: null
+
+training:
+  output_dir: "outputs/dpo"
+  max_seq_length: 512
+  max_prompt_length: 256
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 0.000005
+  warmup_ratio: 0.03
+  logging_steps: 5
+  eval_steps: 100
+  save_steps: 100
+  save_total_limit: 2
+  gradient_checkpointing: true
+  fp16: true
+  bf16: false
+  seed: 42
+  push_to_hub: false
+  hub_model_id: null
+  report_to: "none"
+
+dpo:
+  beta: 0.1
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  bias: "none"
+  target_modules: null

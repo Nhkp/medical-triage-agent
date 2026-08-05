@@ -1,0 +1,41 @@
+model:
+  name: "Qwen/Qwen3-1.7B-Base"
+  revision: null
+  trust_remote_code: false
+  load_in_4bit: true
+
+data:
+  train_file: "data/processed/training/sft_train.jsonl"
+  validation_file: "data/processed/training/sft_validation.jsonl"
+  test_file: "data/processed/training/sft_test.jsonl"
+  prompt_field: "prompt"
+  response_field: "response"
+  system_message: null
+
+training:
+  output_dir: "outputs/sft"
+  max_seq_length: 512
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 0.0002
+  warmup_ratio: 0.03
+  logging_steps: 5
+  eval_steps: 100
+  save_steps: 100
+  save_total_limit: 2
+  gradient_checkpointing: true
+  fp16: true
+  bf16: false
+  seed: 42
+  push_to_hub: false
+  hub_model_id: null
+  report_to: "none"
+
+lora:
+  r: 16
+  alpha: 32
+  dropout: 0.05
+  bias: "none"
+  target_modules: null

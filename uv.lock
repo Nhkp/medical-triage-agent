@@ -172,6 +172,20 @@ wheels = [
 ]
 
 [[package]]
+name = "bitsandbytes"
+version = "0.50.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "packaging", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+    { name = "torch", marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d2/3a/fe0f0c7186436038319f15156386e844abc2ae1e54b8cda3f53b81a96cb9/bitsandbytes-0.50.0-py3-none-manylinux_2_24_aarch64.whl", hash = "sha256:824d931d8e77d7db09bb26d940268d36920e0757e2a2f49cce8766e309e13048", size = 23776757, upload-time = "2026-07-25T01:34:17.305Z" },
+    { url = "https://files.pythonhosted.org/packages/22/08/9501f4fc830448a6862bd5313df94a7dd1ae678f4f81087b96569d4a6f8b/bitsandbytes-0.50.0-py3-none-manylinux_2_24_x86_64.whl", hash = "sha256:173d137610468bec9cddbaa2e049254e97792657ab984e3e737bec1772c1668c", size = 40860117, upload-time = "2026-07-25T01:34:21.049Z" },
+]
+
+[[package]]
 name = "brotli"
 version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -747,8 +761,11 @@ serving = [
     { name = "uvicorn", extra = ["standard"] },
 ]
 training = [
+    { name = "accelerate" },
+    { name = "bitsandbytes", marker = "sys_platform == 'linux'" },
     { name = "datasets" },
     { name = "peft" },
+    { name = "pyyaml" },
     { name = "trackio" },
     { name = "transformers" },
     { name = "trl" },
@@ -756,12 +773,15 @@ training = [
 
 [package.metadata]
 requires-dist = [
+    { name = "accelerate", marker = "extra == 'training'", specifier = ">=1.0.0" },
+    { name = "bitsandbytes", marker = "sys_platform == 'linux' and extra == 'training'", specifier = ">=0.43.0" },
     { name = "datasets", marker = "extra == 'training'", specifier = ">=4.0.0" },
     { name = "fastapi", marker = "extra == 'serving'", specifier = ">=0.116.0" },
     { name = "mypy", specifier = ">=2.3.0" },
     { name = "peft", marker = "extra == 'training'", specifier = ">=0.17.0" },
     { name = "pre-commit", specifier = ">=4.3.0" },
     { name = "pytest", specifier = ">=9.1.1" },
+    { name = "pyyaml", marker = "extra == 'training'", specifier = ">=6.0.0" },
     { name = "ruff", specifier = ">=0.16.1" },
     { name = "trackio", marker = "extra == 'training'", specifier = ">=0.2.0" },
     { name = "transformers", marker = "extra == 'training'", specifier = ">=4.56.0" },

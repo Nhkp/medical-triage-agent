@@ -1,0 +1,34 @@
+model:
+  name: "Qwen/Qwen3-1.7B-Base"
+  adapter_path: "outputs/sft"
+  revision: null
+  trust_remote_code: false
+  load_in_4bit: true
+
+data:
+  train_file: "data/processed/training/sft_train.jsonl"
+  validation_file: "data/processed/training/sft_clinical_eval.jsonl"
+  prompt_field: "prompt"
+  system_message: null
+
+training:
+  output_dir: "outputs/grpo-poc"
+  max_seq_length: 512
+  num_train_epochs: 1
+  per_device_train_batch_size: 1
+  gradient_accumulation_steps: 8
+  learning_rate: 0.000001
+  logging_steps: 5
+  save_steps: 100
+  save_total_limit: 1
+  gradient_checkpointing: true
+  fp16: true
+  bf16: false
+  seed: 42
+  push_to_hub: false
+  hub_model_id: null
+  report_to: "none"
+
+grpo:
+  beta: 0.04
+  num_generations: 2
