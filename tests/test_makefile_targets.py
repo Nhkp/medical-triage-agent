@@ -14,9 +14,17 @@ def test_makefile_exposes_data_preparation_targets() -> None:
         "data-summary:",
         "data-ready:",
         "data-clean:",
+        "train-sft-smoke:",
+        "train-dpo-smoke:",
+        "train-grpo-smoke:",
+        "eval-models:",
     ):
         assert target in makefile
 
     assert "build-training-data" in makefile
     assert "audit-training-data" in makefile
     assert "summarize-training-data" in makefile
+    assert "scripts/train_sft.py" in makefile
+    assert "scripts/train_dpo.py" in makefile
+    assert "scripts/train_grpo.py" in makefile
+    assert "scripts/evaluate.py" in makefile

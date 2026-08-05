@@ -11,4 +11,9 @@ data/processed/
 data/audit/
 models/
 checkpoints/
+outputs/
+kaggle/working/
+kaggle/input/
+wandb/
+runs/
 .cache/

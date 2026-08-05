@@ -4,7 +4,7 @@ DPO_TARGET ?= 1000
 SFT_MEDIQA ?= 2000
 SFT_FRENCHMEDMCQA ?= 1000
 
-.PHONY: sync sync-training check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean clean
+.PHONY: sync sync-training check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean train-sft-smoke train-dpo-smoke train-grpo-smoke eval-models clean
 
 sync:
 	uv sync
@@ -49,6 +49,18 @@ data-ready: sync-training data-build data-audit data-card data-summary
 
 data-clean:
 	rm -rf $(DATA_OUT)
+
+train-sft-smoke:
+	uv run scripts/train_sft.py --config configs/sft_kaggle.yaml --max-steps 5 --dry-run
+
+train-dpo-smoke:
+	uv run scripts/train_dpo.py --config configs/dpo_kaggle.yaml --max-steps 5 --dry-run
+
+train-grpo-smoke:
+	uv run scripts/train_grpo.py --config configs/grpo_kaggle.yaml --max-steps 5 --dry-run
+
+eval-models:
+	uv run scripts/evaluate.py --config configs/sft_kaggle.yaml --model base --dry-run
 
 clean:
 	find . -type d \( -name __pycache__ -o -name .pytest_cache -o -name .mypy_cache -o -name .ruff_cache \) -prune -exec rm -rf {} +
