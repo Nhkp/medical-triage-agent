@@ -1,0 +1,40 @@
+[project]
+name = "medical-triage-agent"
+version = "0.1.0"
+description = "CHSA medical triage assistant proof of concept"
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "mypy>=2.3.0",
+    "pre-commit>=4.3.0",
+    "pytest>=9.1.1",
+    "ruff>=0.16.1",
+]
+
+[project.optional-dependencies]
+serving = [
+    "fastapi>=0.116.0",
+    "uvicorn[standard]>=0.35.0",
+]
+training = [
+    "datasets>=4.0.0",
+    "peft>=0.17.0",
+    "trackio>=0.2.0",
+    "transformers>=4.56.0",
+    "trl>=1.0.0",
+]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
