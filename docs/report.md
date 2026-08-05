@@ -6,7 +6,7 @@ TODO: summarize the final POC results, clinical value, and limits.
 
 ## Dataset preparation
 
-Current status:
+Current status: completed locally for the POC technical milestone.
 
 - MediQAl is verified from Hugging Face metadata as public, ungated, French medical QA,
   license `cc-by-4.0`.
@@ -15,7 +15,46 @@ Current status:
 - FrenchMedMCQA is manually verified by the project owner as `apache-2.0`.
 - MedQuAD is manually verified by the project owner as `apache-2.0`.
 
-TODO: add generated split counts, manifest hashes, anonymization findings, and Hub dataset URL.
+Generated local artifacts:
+
+- Generation timestamp: `2026-08-05T17:59:36Z`.
+- Output folder: `data/processed/training`.
+- SFT records: `5,000`.
+- DPO records: `1,000`.
+- Language counts: `3,406` English records and `2,594` French records.
+- Source counts: MediQAl `2,000`, FrenchMedMCQA `594`, MedQuad `2,406`,
+  UltraMedical-Preference `1,000`.
+- Rejected source rows: MediQAl `763`, FrenchMedMCQA `1`, MedQuad `53`,
+  UltraMedical-Preference `2`.
+- Audit status: passed with `0` PII findings, `0` duplicate findings, and `0` missing
+  provenance findings.
+
+Split counts:
+
+| kind | train | validation | test | clinical_eval |
+| --- | ---: | ---: | ---: | ---: |
+| SFT | 4,001 | 490 | 357 | 152 |
+| DPO | 791 | 111 | 65 | 33 |
+
+Content hashes:
+
+| file group | train | validation | test | clinical_eval |
+| --- | --- | --- | --- | --- |
+| SFT | `1f252e086b0b57b31dda5d43a9180f7c22433c602b75deac83e5db501a179a89` | `f891e59a39debb72a389d0ebd619a008c80f40e6a59314701fc66160d1ffa404` | `0b3d3db6af4f662a222d245a1b9602e7ac8ee01e3032a38833ddbe18977bb76b` | `97af7891b655db90bdc0c0e8484420d430dd714e3fd345f91a85e8b1230a5f9e` |
+| DPO | `f5f2be54f29ec4ace656e384a542f08fbb880cecacd9739f13b223322822d16d` | `e66744a5153cc9e6d0601443430afc41455a699c94e4af01356300e411c157e2` | `4638e5ed031c574354a9319c27ec89dcd36483e6d490817d86ec3ac2bbc7313b` | `a4bed2fb0ee561d77edb2ce94835f0f654cf6d6772bba4b9b7d1d02638b8bb83` |
+
+Clinical review queue:
+
+- `5,000` records are queued for clinician review because public medical QA sources are not
+  CHSA triage-labeled data.
+- This queue is evidence of validation debt, not completed clinician sign-off.
+
+Hugging Face publication:
+
+- Private dataset publication is blocked in the local environment because `HF_TOKEN` and
+  `HF_DATASET_REPO` are not configured.
+- Once configured, publish only the generated anonymized splits and dataset card from
+  `data/processed/training`; do not publish local audit logs containing raw text.
 
 Local data-preparation command:
 

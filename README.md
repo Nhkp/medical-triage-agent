@@ -79,6 +79,9 @@ make data-audit
 make data-summary
 ```
 
+The current step-1 local generation produced `5,000` SFT records and `1,000` DPO records under
+`data/processed/training`; those generated artifacts are intentionally ignored by git.
+
 Remove generated training-data artifacts:
 
 ```bash
