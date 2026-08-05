@@ -12,6 +12,7 @@ an autonomous diagnosis or treatment system.
 - Add a runnable test for any non-trivial logic.
 - Follow `docs/code-guidelines.md`, `docs/commit-guidelines.md`, and
   `docs/git-workflow.md`.
+- Use `docs/agents/readme-agent.md` when changing `README.md`.
 - Follow source intake rules in `docs/source-policy.md`.
 - Follow medical safety limits in `docs/medical-safety.md`.
 - Follow privacy and RGPD rules in `docs/privacy-rgpd.md`.
