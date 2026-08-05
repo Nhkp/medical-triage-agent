@@ -1,0 +1,15 @@
+name: deploy-demo
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "demo-*"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: docker/setup-buildx-action@v4
+      - run: docker build -t medical-triage-agent-demo .
