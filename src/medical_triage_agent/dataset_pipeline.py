@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import importlib
 import json
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,6 +12,7 @@ from typing import Any, Literal
 from medical_triage_agent.contracts import DPOExample, Metadata, SFTExample, content_fingerprint
 from medical_triage_agent.dataset_audit import audit_records
 from medical_triage_agent.normalize import assign_split, normalize_dpo_record, normalize_sft_record
+from medical_triage_agent.privacy import find_pii
 from medical_triage_agent.source_registry import (
     SourceRecord,
     load_source_registry,
@@ -38,22 +39,31 @@ class TrainingDataConfig:
     sft_frenchmedmcqa: int = 1000
 
 
+@dataclass(frozen=True)
+class SourceLoadResult[RecordT: (SFTExample, DPOExample)]:
+    records: list[RecordT]
+    rejected: int = 0
+
+
 def load_hf_sft_records(source_id: str, limit: int | None = None) -> list[SFTExample]:
+    return list(_load_hf_sft_records_with_rejections(source_id, limit).records)
+
+
+def _load_hf_sft_records_with_rejections(
+    source_id: str, limit: int | None = None
+) -> SourceLoadResult[SFTExample]:
     registry = load_source_registry()
     source = validate_source_for_use(source_id, "sft", registry)
 
     if source_id == "mediqa":
         dataset = _load_hf_dataset("ANR-MALADES/MediQAl", "oeq", split="test")
-        rows = _limit(dataset, limit)
-        return [map_mediqa_oeq(row, source) for row in rows]
+        return _map_rows(dataset, limit, lambda row: map_mediqa_oeq(row, source))
     if source_id == "frenchmedmcqa":
         dataset = _load_hf_dataset("nthngdy/frenchmedmcqa", split="train")
-        rows = _limit(dataset, limit)
-        return [map_frenchmedmcqa(row, source) for row in rows]
+        return _map_rows(dataset, limit, lambda row: map_frenchmedmcqa(row, source))
     if source_id == "medquad":
         dataset = _load_hf_dataset("keivalya/MedQuad-MedicalQnADataset", split="train")
-        rows = _limit(dataset, limit)
-        return [map_medquad(row, source) for row in rows]
+        return _map_rows(dataset, limit, lambda row: map_medquad(row, source))
     raise ValueError(f"no SFT mapper is implemented for source: {source_id}")
 
 
@@ -123,14 +133,19 @@ def map_medquad(row: dict[str, Any], source: SourceRecord) -> SFTExample:
 
 
 def load_hf_dpo_records(source_id: str, limit: int | None = None) -> list[DPOExample]:
+    return list(_load_hf_dpo_records_with_rejections(source_id, limit).records)
+
+
+def _load_hf_dpo_records_with_rejections(
+    source_id: str, limit: int | None = None
+) -> SourceLoadResult[DPOExample]:
     registry = load_source_registry()
     source = validate_source_for_use(source_id, "dpo", registry)
     if source_id != "ultramedical_preference":
         raise ValueError(f"no DPO mapper is implemented for source: {source_id}")
 
     dataset = _load_hf_dataset("TsinghuaC3I/UltraMedical-Preference", split="train")
-    rows = _limit(dataset, limit)
-    return [map_ultramedical_preference(row, source) for row in rows]
+    return _map_rows(dataset, limit, lambda row: map_ultramedical_preference(row, source))
 
 
 def map_mediqa_oeq(row: dict[str, Any], source: SourceRecord) -> SFTExample:
@@ -222,15 +237,17 @@ def write_splits(
 def build_training_data(config: TrainingDataConfig) -> dict[str, Any]:
     config.output_dir.mkdir(parents=True, exist_ok=True)
     # Build SFT and DPO together so the manifest describes one coherent training snapshot.
-    sft_records = _build_sft_records(config)
-    dpo_records = load_hf_dpo_records("ultramedical_preference", config.dpo_target)
+    sft_records, rejected_counts = _build_sft_records(config)
+    dpo_result = _load_hf_dpo_records_with_rejections("ultramedical_preference", config.dpo_target)
+    dpo_records = list(dpo_result.records)
+    rejected_counts["ultramedical_preference"] = dpo_result.rejected
 
     sft_rows = _split_examples(sft_records)
     dpo_rows = _split_examples(dpo_records)
     sft_paths = _write_kind_splits(config.output_dir, "sft", sft_rows)
     dpo_paths = _write_kind_splits(config.output_dir, "dpo", dpo_rows)
 
-    audit_report = build_audit_report(sft_rows, dpo_rows)
+    audit_report = build_audit_report(sft_rows, dpo_rows, rejected_counts=rejected_counts)
     audit_report_path = config.output_dir / "audit_report.json"
     audit_report_path.write_text(
         json.dumps(audit_report, ensure_ascii=False, indent=2) + "\n",
@@ -248,6 +265,7 @@ def build_training_data(config: TrainingDataConfig) -> dict[str, Any]:
         audit_report_path=audit_report_path,
         clinical_review_queue_path=review_queue_path,
         split_paths=(*sft_paths, *dpo_paths),
+        rejected_counts=rejected_counts,
     )
     manifest_path = config.output_dir / "manifest.json"
     manifest_path.write_text(
@@ -261,8 +279,15 @@ def build_training_data(config: TrainingDataConfig) -> dict[str, Any]:
 def audit_training_data(output_dir: Path) -> dict[str, Any]:
     sft_rows = _read_kind_splits(output_dir, "sft")
     dpo_rows = _read_kind_splits(output_dir, "dpo")
-    audit_report = build_audit_report(sft_rows, dpo_rows)
     manifest_path = output_dir / "manifest.json"
+    manifest = (
+        json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.exists() else {}
+    )
+    audit_report = build_audit_report(
+        sft_rows,
+        dpo_rows,
+        rejected_counts=manifest.get("rejected_counts"),
+    )
     # These files are part of the release artifact contract, not nice-to-have sidecars.
     if not manifest_path.exists():
         audit_report["errors"].append("missing manifest.json")
@@ -314,6 +339,7 @@ def build_training_manifest(
     audit_report_path: Path,
     clinical_review_queue_path: Path,
     split_paths: tuple[Path, ...],
+    rejected_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     all_rows = _all_rows(sft_rows, dpo_rows)
     # The manifest is intentionally redundant: it should be enough to audit a dataset folder
@@ -341,7 +367,7 @@ def build_training_manifest(
         "transforms": sorted(
             {transform for row in all_rows for transform in row["metadata"].get("transforms", [])}
         ),
-        "rejected_counts": {"sft": 0, "dpo": 0},
+        "rejected_counts": rejected_counts or {"sft": 0, "dpo": 0},
         "audit_report_path": str(audit_report_path),
         "clinical_review_queue_path": str(clinical_review_queue_path),
         "files": [str(path) for path in split_paths],
@@ -351,6 +377,8 @@ def build_training_manifest(
 def build_audit_report(
     sft_rows: dict[str, list[dict[str, Any]]],
     dpo_rows: dict[str, list[dict[str, Any]]],
+    *,
+    rejected_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     errors: list[str] = []
     # Reuse row-level audits here; this wrapper adds cross-split and artifact-level signals.
@@ -368,7 +396,7 @@ def build_audit_report(
             "sft": len(_all_rows(sft_rows)),
             "dpo": len(_all_rows(dpo_rows)),
         },
-        "rejected_counts": {"sft": 0, "dpo": 0},
+        "rejected_counts": rejected_counts or {"sft": 0, "dpo": 0},
         "pii_findings": sum("possible PII" in error for error in errors),
         "duplicate_findings": sum("duplicate" in error for error in errors),
         "missing_provenance_findings": sum("source" in error for error in errors),
@@ -453,19 +481,23 @@ def make_dataset_card(manifest_path: Path, output_path: Path) -> Path:
     return output_path
 
 
-def _build_sft_records(config: TrainingDataConfig) -> list[SFTExample]:
+def _build_sft_records(config: TrainingDataConfig) -> tuple[list[SFTExample], dict[str, int]]:
     mediqa_target = min(config.sft_mediqa, config.sft_target)
     french_target = min(config.sft_frenchmedmcqa, max(0, config.sft_target - mediqa_target))
-    records = [
-        *load_hf_sft_records("mediqa", mediqa_target),
-        *load_hf_sft_records("frenchmedmcqa", french_target),
-    ]
+    mediqa = _load_hf_sft_records_with_rejections("mediqa", mediqa_target)
+    french = _load_hf_sft_records_with_rejections("frenchmedmcqa", french_target)
+    rejected_counts = {"mediqa": mediqa.rejected, "frenchmedmcqa": french.rejected}
+    records = [*mediqa.records, *french.records]
     remaining = max(0, config.sft_target - len(records))
     if remaining:
         # MedQuad is the English filler source; this keeps the target size stable when French
         # sources are smaller than requested.
-        records.extend(load_hf_sft_records("medquad", remaining))
-    return records[: config.sft_target]
+        medquad = _load_hf_sft_records_with_rejections("medquad", remaining)
+        records.extend(medquad.records)
+        rejected_counts["medquad"] = medquad.rejected
+    else:
+        rejected_counts["medquad"] = 0
+    return list(records[: config.sft_target]), rejected_counts
 
 
 def _split_examples(records: Iterable[SFTExample | DPOExample]) -> dict[str, list[dict[str, Any]]]:
@@ -560,10 +592,47 @@ def _split_count_lines(manifest: dict[str, Any]) -> list[str]:
     return [f"| {split} | {count} |" for split, count in split_counts.items()]
 
 
-def _limit(rows: Iterable[dict[str, Any]], limit: int | None) -> Iterable[dict[str, Any]]:
-    if limit is None:
-        return rows
-    return (row for index, row in enumerate(rows) if index < limit)
+def _map_rows[RecordT: (SFTExample, DPOExample)](
+    rows: Iterable[dict[str, Any]],
+    limit: int | None,
+    mapper: Callable[[dict[str, Any]], RecordT],
+) -> SourceLoadResult[RecordT]:
+    records: list[RecordT] = []
+    rejected = 0
+    seen_ids: set[str] = set()
+    seen_fingerprints: set[str] = set()
+    for row in rows:
+        try:
+            record = mapper(row)
+        except (TypeError, ValueError):
+            rejected += 1
+            continue
+        record_dict = record.to_dict()
+        fingerprint = content_fingerprint(record_dict)
+        if record.id in seen_ids or fingerprint in seen_fingerprints or _contains_pii(record_dict):
+            rejected += 1
+            continue
+        seen_ids.add(record.id)
+        seen_fingerprints.add(fingerprint)
+        records.append(record)
+        if limit is not None and len(records) >= limit:
+            break
+    return SourceLoadResult(records=records, rejected=rejected)
+
+
+def _contains_pii(record: dict[str, Any]) -> bool:
+    return any(find_pii(value) for value in _record_strings(record))
+
+
+def _record_strings(value: Any) -> Iterable[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _record_strings(item)
+    elif isinstance(value, list):
+        for item in value:
+            yield from _record_strings(item)
 
 
 def _load_hf_dataset(*args: Any, **kwargs: Any) -> Iterable[dict[str, Any]]:

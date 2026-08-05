@@ -165,16 +165,16 @@ def test_unknown_sft_source_cannot_be_ingested_before_optional_imports() -> None
 def test_build_training_data_creates_artifacts_with_source_fill(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    def fake_sft(source_id: str, limit: int | None) -> list[SFTExample]:
+    def fake_sft(source_id: str, limit: int | None) -> pipeline.SourceLoadResult[SFTExample]:
         count = {"mediqa": 1, "frenchmedmcqa": 1, "medquad": limit or 0}[source_id]
-        return [_sft_example(source_id, index) for index in range(count)]
+        return pipeline.SourceLoadResult([_sft_example(source_id, index) for index in range(count)])
 
-    def fake_dpo(source_id: str, limit: int | None) -> list[DPOExample]:
+    def fake_dpo(source_id: str, limit: int | None) -> pipeline.SourceLoadResult[DPOExample]:
         assert source_id == "ultramedical_preference"
-        return [_dpo_example(index) for index in range(limit or 0)]
+        return pipeline.SourceLoadResult([_dpo_example(index) for index in range(limit or 0)])
 
-    monkeypatch.setattr(pipeline, "load_hf_sft_records", fake_sft)
-    monkeypatch.setattr(pipeline, "load_hf_dpo_records", fake_dpo)
+    monkeypatch.setattr(pipeline, "_load_hf_sft_records_with_rejections", fake_sft)
+    monkeypatch.setattr(pipeline, "_load_hf_dpo_records_with_rejections", fake_dpo)
 
     manifest = build_training_data(
         TrainingDataConfig(
@@ -202,13 +202,17 @@ def test_build_training_data_creates_artifacts_with_source_fill(
 def test_audit_and_summary_training_data(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         pipeline,
-        "load_hf_sft_records",
-        lambda source_id, limit: [_sft_example(source_id, index) for index in range(limit or 0)],
+        "_load_hf_sft_records_with_rejections",
+        lambda source_id, limit: pipeline.SourceLoadResult(
+            [_sft_example(source_id, index) for index in range(limit or 0)]
+        ),
     )
     monkeypatch.setattr(
         pipeline,
-        "load_hf_dpo_records",
-        lambda source_id, limit: [_dpo_example(index) for index in range(limit or 0)],
+        "_load_hf_dpo_records_with_rejections",
+        lambda source_id, limit: pipeline.SourceLoadResult(
+            [_dpo_example(index) for index in range(limit or 0)]
+        ),
     )
     build_training_data(TrainingDataConfig(output_dir=tmp_path, sft_target=3, dpo_target=1))
 
@@ -218,6 +222,24 @@ def test_audit_and_summary_training_data(tmp_path: Path, monkeypatch: pytest.Mon
     assert audit["passed"] is True
     assert summary["actual_counts"] == {"sft": 3, "dpo": 1}
     assert len(summary["files"]) == 8
+
+
+def test_map_rows_rejects_malformed_duplicates_and_pii() -> None:
+    rows = [
+        {"value": "valid"},
+        {"value": ""},
+        {"value": "valid"},
+        {"value": "appelez 06 12 34 56 78"},
+    ]
+
+    result = pipeline._map_rows(
+        rows,
+        limit=2,
+        mapper=lambda row: _sft_example("fixture", 1, input_text=row["value"]),
+    )
+
+    assert len(result.records) == 1
+    assert result.rejected == 3
 
 
 def _metadata(source_id: str) -> Metadata:
@@ -233,13 +255,13 @@ def _metadata(source_id: str) -> Metadata:
     )
 
 
-def _sft_example(source_id: str, index: int) -> SFTExample:
+def _sft_example(source_id: str, index: int, input_text: str | None = None) -> SFTExample:
     return SFTExample.from_mapping(
         {
             "id": f"sft_{source_id}_{index}",
             "language": "en" if source_id == "medquad" else "fr",
             "instruction": "Answer.",
-            "input": f"Question {source_id} {index}",
+            "input": input_text if input_text is not None else f"Question {source_id} {index}",
             "output": f"Answer {source_id} {index}",
             "source_ids": [source_id],
             "metadata": _metadata(source_id).to_dict(),
