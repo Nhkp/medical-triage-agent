@@ -13,6 +13,7 @@ an autonomous diagnosis or treatment system.
 - Follow `docs/code-guidelines.md`, `docs/commit-guidelines.md`, and
   `docs/git-workflow.md`.
 - Use `docs/agents/readme-agent.md` when changing `README.md`.
+- Use `docs/agents/presentation-agent.md` when changing presentation material.
 - Follow source intake rules in `docs/source-policy.md`.
 - Follow medical safety limits in `docs/medical-safety.md`.
 - Follow privacy and RGPD rules in `docs/privacy-rgpd.md`.
