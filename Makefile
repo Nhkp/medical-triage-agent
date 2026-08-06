@@ -4,13 +4,19 @@ DPO_TARGET ?= 1000
 SFT_MEDIQA ?= 2000
 SFT_FRENCHMEDMCQA ?= 1000
 
-.PHONY: sync sync-training check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean train-sft-smoke train-dpo-smoke train-grpo-smoke eval-models clean
+PRESENTATION_HTML ?= presentations/chsa-current-state/index.html
+PRESENTATION_OUT ?= dist/presentations/chsa-current-state.pptx
+
+.PHONY: sync sync-training sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean train-sft-smoke train-dpo-smoke train-grpo-smoke eval-models presentation-html presentation-pptx presentation-ready clean
 
 sync:
 	uv sync
 
 sync-training:
 	uv sync --extra training
+
+sync-presentation:
+	uv sync --extra presentation
 
 check:
 	scripts/check.sh
@@ -61,6 +67,14 @@ train-grpo-smoke:
 
 eval-models:
 	uv run scripts/evaluate.py --config configs/sft_kaggle.yaml --model base --dry-run
+
+presentation-html:
+	uv run python scripts/export_presentation.py --input $(PRESENTATION_HTML) --dry-run
+
+presentation-pptx:
+	uv run --extra presentation python scripts/export_presentation.py --input $(PRESENTATION_HTML) --output $(PRESENTATION_OUT)
+
+presentation-ready: presentation-html presentation-pptx
 
 clean:
 	find . -type d \( -name __pycache__ -o -name .pytest_cache -o -name .mypy_cache -o -name .ruff_cache \) -prune -exec rm -rf {} +

@@ -12,6 +12,7 @@ data/audit/
 models/
 checkpoints/
 outputs/
+dist/
 kaggle/working/
 kaggle/input/
 wandb/
