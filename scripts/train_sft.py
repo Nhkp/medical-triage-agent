@@ -85,6 +85,7 @@ def run_training(
         args=SFTConfig(
             output_dir=str(config.output_dir()),
             max_length=config.max_seq_length(),
+            dataset_text_field="text",
             num_train_epochs=training_config["num_train_epochs"],
             max_steps=int(training_config.get("max_steps", -1)),
             per_device_train_batch_size=training_config["per_device_train_batch_size"],
@@ -116,11 +117,13 @@ def _load_sft_dataset(
     path: Path, *, tokenizer: Any, system_message: str | None, max_samples: int | None
 ) -> list[dict[str, Any]]:
     rows = [
-        sft_to_training_row(
-            SFTExample.from_mapping(row),
-            tokenizer=tokenizer,
-            system_message=system_message,
-        )
+        {
+            "text": sft_to_training_row(
+                SFTExample.from_mapping(row),
+                tokenizer=tokenizer,
+                system_message=system_message,
+            )["text"]
+        }
         for row in load_jsonl(str(path))
     ]
     return rows[:max_samples] if max_samples is not None else rows
