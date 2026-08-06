@@ -51,10 +51,13 @@ Clinical review queue:
 
 Hugging Face publication:
 
-- Private dataset publication is blocked in the local environment because `HF_TOKEN` and
-  `HF_DATASET_REPO` are not configured.
-- Once configured, publish only the generated anonymized splits and dataset card from
-  `data/processed/training`; do not publish local audit logs containing raw text.
+- Private dataset publication completed on Hugging Face:
+  `https://huggingface.co/datasets/Lokhidor/medical-triage-dataset`.
+- Hub commit: `170e68c354e78fac153b732d6fa8a0ce6e269fa3`.
+- Published files: SFT/DPO train, validation, test, clinical-evaluation JSONL splits,
+  `manifest.json`, and the dataset card `README.md`.
+- Local `audit_report.json` and `clinical_review_queue.jsonl` were not uploaded.
+- Repository visibility was verified as private after upload.
 
 Local data-preparation command:
 
