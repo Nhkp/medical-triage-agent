@@ -85,7 +85,6 @@ def run_training(
         args=SFTConfig(
             output_dir=str(config.output_dir()),
             max_length=config.max_seq_length(),
-            dataset_text_field="text",
             num_train_epochs=training_config["num_train_epochs"],
             max_steps=int(training_config.get("max_steps", -1)),
             per_device_train_batch_size=training_config["per_device_train_batch_size"],

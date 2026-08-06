@@ -22,6 +22,7 @@ def test_sft_formatting_preserves_safety_system_message() -> None:
 
     assert DEFAULT_SYSTEM_MESSAGE in row["text"]
     assert "douleur thoracique" in row["prompt"]
+    assert row["completion"] == "Escalader vers une evaluation urgente."
     assert row["response"] == "Escalader vers une evaluation urgente."
 
 

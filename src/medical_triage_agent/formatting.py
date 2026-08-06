@@ -22,6 +22,7 @@ def sft_to_training_row(
     row = {
         "id": example.id,
         "prompt": prompt,
+        "completion": response,
         "response": response,
         "language": example.language,
         "source_ids": example.source_ids,
