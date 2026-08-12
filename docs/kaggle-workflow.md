@@ -40,19 +40,19 @@ Then run the smallest real SFT job:
 
 ```bash
 uv sync --extra training
-uv run scripts/train_sft.py --config configs/sft_kaggle.yaml --max-steps 5 --max-train-samples 32
+uv run scripts/train_sft.py --config configs/sft.yaml --max-steps 5 --max-train-samples 32
 ```
 
 Run DPO only after SFT has produced an adapter:
 
 ```bash
-uv run scripts/train_dpo.py --config configs/dpo_kaggle.yaml --max-steps 5 --max-train-samples 32
+uv run scripts/train_dpo.py --config configs/dpo.yaml --max-steps 5 --max-train-samples 32
 ```
 
 GRPO is optional and should stay a proof of concept unless SFT and DPO are already working:
 
 ```bash
-uv run scripts/train_grpo.py --config configs/grpo_kaggle.yaml --max-steps 5 --max-train-samples 16
+uv run scripts/train_grpo.py --config configs/grpo.yaml --max-steps 5 --max-train-samples 16
 ```
 
 ## Evaluation
@@ -60,9 +60,9 @@ uv run scripts/train_grpo.py --config configs/grpo_kaggle.yaml --max-steps 5 --m
 Use deterministic decoding for model comparisons:
 
 ```bash
-uv run scripts/evaluate.py --config configs/sft_kaggle.yaml --model base --output outputs/evaluations/base.json
-uv run scripts/evaluate.py --config configs/sft_kaggle.yaml --model sft --adapter-path outputs/sft --output outputs/evaluations/sft.json
-uv run scripts/evaluate.py --config configs/sft_kaggle.yaml --model dpo --adapter-path outputs/dpo --output outputs/evaluations/dpo.json
+uv run scripts/evaluate.py --config configs/sft.yaml --model base --output outputs/evaluations/base.json
+uv run scripts/evaluate.py --config configs/sft.yaml --model sft --adapter-path outputs/sft --output outputs/evaluations/sft.json
+uv run scripts/evaluate.py --config configs/sft.yaml --model dpo --adapter-path outputs/dpo --output outputs/evaluations/dpo.json
 ```
 
 Automatic metrics are technical indicators only. They do not prove clinical safety or

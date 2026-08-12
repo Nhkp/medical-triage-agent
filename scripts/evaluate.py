@@ -133,7 +133,7 @@ def _extract_triage(response: str) -> str:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Evaluate base/SFT/DPO models deterministically")
-    parser.add_argument("--config", default="configs/sft_kaggle.yaml")
+    parser.add_argument("--config", default="configs/sft.yaml")
     parser.add_argument("--model", choices=["base", "sft", "dpo"], default="base")
     parser.add_argument("--adapter-path")
     parser.add_argument("--output", default="outputs/evaluations/base.json")

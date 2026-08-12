@@ -17,8 +17,8 @@ scripts must push checkpoints and final adapters to the Hub.
 Recommended smoke run:
 
 ```bash
-uv run scripts/train_sft.py --config configs/sft_kaggle.yaml --max-steps 5 --dry-run
-uv run scripts/train_dpo.py --config configs/dpo_kaggle.yaml --max-steps 5 --dry-run
+uv run scripts/train_sft.py --config configs/sft.yaml --max-steps 5 --dry-run
+uv run scripts/train_dpo.py --config configs/dpo.yaml --max-steps 5 --dry-run
 ```
 
 For managed jobs, upload or inline the script, use `a10g-large` as the default Qwen3-1.7B

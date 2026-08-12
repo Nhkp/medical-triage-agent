@@ -152,7 +152,7 @@ def _make_grpo_config(config_class: Any, **kwargs: Any) -> Any:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run a small optional GRPO POC")
-    parser.add_argument("--config", default="configs/grpo_kaggle.yaml")
+    parser.add_argument("--config", default="configs/grpo.yaml")
     parser.add_argument("--max-steps", type=int)
     parser.add_argument("--max-train-samples", type=int)
     parser.add_argument("--dry-run", action="store_true")

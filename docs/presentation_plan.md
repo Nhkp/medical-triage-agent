@@ -76,7 +76,7 @@
 
 - Purpose: explain SFT/DPO execution strategy.
 - Key message: Qwen3-1.7B-Base, 4-bit QLoRA SFT, then DPO, with conservative Colab/Kaggle defaults.
-- Evidence: `configs/sft_kaggle.yaml`, `configs/dpo_kaggle.yaml`, `scripts/train_sft.py`, `scripts/train_dpo.py`.
+- Evidence: `configs/sft.yaml`, `configs/dpo.yaml`, `scripts/train_sft.py`, `scripts/train_dpo.py`.
 - Visual: base model -> SFT adapter -> DPO adapter.
 - Narrative: start small, smoke-test, push adapters to Hugging Face when stable.
 

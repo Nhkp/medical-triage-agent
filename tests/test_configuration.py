@@ -9,7 +9,7 @@ from medical_triage_agent.configuration import ConfigurationError, load_training
 
 def test_load_training_config_applies_overrides_without_requiring_files() -> None:
     config = load_training_config(
-        "configs/sft_kaggle.yaml",
+        "configs/sft.yaml",
         method="sft",
         overrides={"training.max_steps": 5, "training.push_to_hub": False},
         require_files=False,
@@ -50,7 +50,7 @@ training:
 def test_config_rejects_conflicting_precision() -> None:
     with pytest.raises(ConfigurationError, match="cannot both be true"):
         load_training_config(
-            "configs/sft_kaggle.yaml",
+            "configs/sft.yaml",
             method="sft",
             overrides={"training.bf16": True},
             require_files=False,
@@ -60,7 +60,7 @@ def test_config_rejects_conflicting_precision() -> None:
 def test_push_to_hub_requires_actionable_model_id() -> None:
     with pytest.raises(ConfigurationError, match="--hub-model-id <namespace/model-repo>"):
         load_training_config(
-            "configs/sft_kaggle.yaml",
+            "configs/sft.yaml",
             method="sft",
             overrides={"training.push_to_hub": True, "training.hub_model_id": None},
             require_files=False,

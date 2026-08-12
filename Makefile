@@ -59,16 +59,16 @@ data-clean:
 	rm -rf $(DATA_OUT)
 
 train-sft-smoke:
-	uv run scripts/train_sft.py --config configs/sft_kaggle.yaml --max-steps 5 --dry-run
+	uv run scripts/train_sft.py --config configs/sft.yaml --max-steps 5 --dry-run
 
 train-dpo-smoke:
-	uv run scripts/train_dpo.py --config configs/dpo_kaggle.yaml --max-steps 5 --dry-run
+	uv run scripts/train_dpo.py --config configs/dpo.yaml --max-steps 5 --dry-run
 
 train-grpo-smoke:
-	uv run scripts/train_grpo.py --config configs/grpo_kaggle.yaml --max-steps 5 --dry-run
+	uv run scripts/train_grpo.py --config configs/grpo.yaml --max-steps 5 --dry-run
 
 eval-models:
-	uv run scripts/evaluate.py --config configs/sft_kaggle.yaml --model base --dry-run
+	uv run scripts/evaluate.py --config configs/sft.yaml --model base --dry-run
 
 serve-local:
 	docker compose --profile gpu up --build

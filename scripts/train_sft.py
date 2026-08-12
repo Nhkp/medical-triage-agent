@@ -145,7 +145,7 @@ def _make_sft_config(config_class: Any, **kwargs: Any) -> Any:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run Kaggle-friendly 4-bit QLoRA SFT")
-    parser.add_argument("--config", default="configs/sft_kaggle.yaml")
+    parser.add_argument("--config", default="configs/sft.yaml")
     parser.add_argument("--max-steps", type=int)
     parser.add_argument("--max-train-samples", type=int)
     parser.add_argument("--dry-run", action="store_true")
