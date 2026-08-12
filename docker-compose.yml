@@ -1,0 +1,29 @@
+services:
+  vllm:
+    image: vllm/vllm-openai:latest
+    command: ["--model", "${VLLM_MODEL_ID:-Qwen/Qwen3-1.7B-Base}"]
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+    ports:
+      - "8000:8000"
+    profiles: ["gpu"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: ["gpu"]
+
+  api:
+    build: .
+    environment:
+      VLLM_BASE_URL: ${VLLM_BASE_URL:-http://vllm:8000/v1}
+      VLLM_MODEL_ID: ${VLLM_MODEL_ID:-Qwen/Qwen3-1.7B-Base}
+      VLLM_TIMEOUT_SECONDS: ${VLLM_TIMEOUT_SECONDS:-30}
+      API_KEY: ${API_KEY:-}
+      AUDIT_STORE_PATH: ${AUDIT_STORE_PATH:-}
+    ports:
+      - "8080:8080"
+    depends_on:
+      - vllm

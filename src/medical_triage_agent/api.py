@@ -18,7 +18,7 @@ def triage(payload: dict[str, Any]) -> dict[str, str]:
             disclaimer=response.disclaimer,
             audit_id=response.audit_id,
         )
-    _AUDIT_STORE[response.audit_id] = audit_metadata(payload, response)
+    _AUDIT_STORE[response.audit_id] = audit_metadata(payload, response, model=configured_model())
     return response.to_dict()
 
 
@@ -45,7 +45,10 @@ def create_app() -> Any:
 
     @app.post("/triage")  # type: ignore[untyped-decorator]
     def triage_endpoint(payload: dict[str, Any]) -> dict[str, str]:
-        return triage(payload)
+        try:
+            return triage(payload)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     @app.get("/audit/{audit_id}")  # type: ignore[untyped-decorator]
     def audit_endpoint(audit_id: str) -> dict[str, Any]:

@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from medical_triage_agent.privacy import redact_pii
@@ -51,7 +52,22 @@ class TriageResponse:
         }
 
 
+def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    symptoms = payload.get("symptoms")
+    if not isinstance(symptoms, list) or not symptoms:
+        raise ValueError("symptoms must be a non-empty list of strings")
+    normalized_symptoms = []
+    for symptom in symptoms:
+        if not isinstance(symptom, str) or not symptom.strip():
+            raise ValueError("symptoms must be a non-empty list of strings")
+        normalized_symptoms.append(symptom.strip()[:500])
+    normalized = dict(payload)
+    normalized["symptoms"] = normalized_symptoms[:20]
+    return normalized
+
+
 def assess_triage(payload: dict[str, Any]) -> TriageResponse:
+    payload = validate_payload(payload)
     symptoms = payload.get("symptoms", [])
     symptom_text = " ".join(symptoms) if isinstance(symptoms, list) else str(symptoms)
     normalized = symptom_text.casefold()
@@ -70,12 +86,15 @@ def assess_triage(payload: dict[str, Any]) -> TriageResponse:
     )
 
 
-def audit_metadata(payload: dict[str, Any], response: TriageResponse) -> dict[str, Any]:
+def audit_metadata(
+    payload: dict[str, Any], response: TriageResponse, *, model: str = "rule_based_v1"
+) -> dict[str, Any]:
     redacted_payload = _redact_value(payload)
     return {
         "audit_id": response.audit_id,
         "priority": response.priority,
-        "model": "rule_based_v1",
+        "model": model,
+        "created_at": datetime.now(UTC).isoformat(),
         # Store a hash for traceability without exposing raw patient text through audit APIs.
         "payload_hash": _hash(redacted_payload),
     }

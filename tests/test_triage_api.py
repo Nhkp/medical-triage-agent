@@ -18,8 +18,19 @@ def test_api_audit_returns_metadata_without_raw_patient_text() -> None:
 
     assert audit_record is not None
     assert audit_record["priority"] == "moderee"
+    assert audit_record["model"] == "rule_based_v1"
+    assert "created_at" in audit_record
     assert "patient@example.test" not in str(audit_record)
 
 
 def test_health_reports_rule_based_fallback() -> None:
     assert api.health() == {"status": "ok", "model": "rule_based_v1", "vllm": "disabled"}
+
+
+def test_api_rejects_empty_symptom_payload() -> None:
+    try:
+        api.triage({})
+    except ValueError as exc:
+        assert "symptoms" in str(exc)
+    else:
+        raise AssertionError("empty symptoms should be rejected")
