@@ -159,6 +159,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--resume-from-checkpoint")
     parser.add_argument("--push-to-hub", action="store_true")
+    parser.add_argument("--hub-model-id")
     return parser.parse_args()
 
 
@@ -168,6 +169,8 @@ def _cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
         overrides["training.max_steps"] = args.max_steps
     if args.push_to_hub:
         overrides["training.push_to_hub"] = True
+    if args.hub_model_id:
+        overrides["training.hub_model_id"] = args.hub_model_id
     return overrides
 
 
@@ -181,6 +184,8 @@ def _dry_run_summary(config: TrainingConfig) -> dict[str, Any]:
         "max_seq_length": config.max_seq_length(),
         "beta": config.section("dpo")["beta"],
         "load_in_4bit": bool(config.section("model").get("load_in_4bit", True)),
+        "push_to_hub": bool(config.section("training").get("push_to_hub")),
+        "hub_model_id": config.section("training").get("hub_model_id"),
     }
 
 

@@ -58,6 +58,30 @@ def test_sft_config_filters_kwargs_for_installed_trl_versions() -> None:
     assert config.evaluation_strategy == "steps"
 
 
+def test_training_scripts_accept_hub_model_id_override() -> None:
+    commands = (
+        ["uv", "run", "scripts/train_sft.py", "--config", "configs/sft_kaggle.yaml"],
+        ["uv", "run", "scripts/train_dpo.py", "--config", "configs/dpo_kaggle.yaml"],
+        ["uv", "run", "scripts/train_grpo.py", "--config", "configs/grpo_kaggle.yaml"],
+    )
+
+    for command in commands:
+        result = subprocess.run(
+            [
+                *command,
+                "--dry-run",
+                "--push-to-hub",
+                "--hub-model-id",
+                "Lokhidor/medical-triage-test-adapter",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        assert '"push_to_hub": true' in result.stdout
+        assert '"hub_model_id": "Lokhidor/medical-triage-test-adapter"' in result.stdout
+
+
 def _load_script(name: str, path: Path) -> Any:
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None
