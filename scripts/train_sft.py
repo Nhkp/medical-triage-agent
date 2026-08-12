@@ -16,11 +16,12 @@ from medical_triage_agent.configuration import TrainingConfig, load_training_con
 from medical_triage_agent.contracts import SFTExample, load_jsonl
 from medical_triage_agent.formatting import sft_to_training_row
 from medical_triage_agent.modeling import (
+    cast_trainable_parameters_to_fp32,
     detect_lora_target_modules,
     make_lora_config,
     make_quantization_config,
+    model_loading_dtype_kwargs,
     set_deterministic_seed,
-    torch_dtype_for_precision,
 )
 
 
@@ -64,7 +65,7 @@ def run_training(
         config.model_name(),
         revision=model_config.get("revision"),
         trust_remote_code=bool(model_config.get("trust_remote_code", False)),
-        torch_dtype=torch_dtype_for_precision(config.precision()),
+        **model_loading_dtype_kwargs(config.precision()),
         quantization_config=make_quantization_config(bool(model_config.get("load_in_4bit", True))),
         device_map="auto",
     )
@@ -111,6 +112,7 @@ def run_training(
             report_to=training_config.get("report_to", "none"),
         ),
     )
+    cast_trainable_parameters_to_fp32(trainer.model)
     trainer.train(resume_from_checkpoint=resume)
     trainer.save_model()
     if training_config["push_to_hub"]:

@@ -57,6 +57,23 @@ def torch_dtype_for_precision(precision: str) -> Any | None:
     raise OptionalDependencyError(f"unsupported precision: {precision}")
 
 
+def model_loading_dtype_kwargs(precision: str) -> dict[str, Any]:
+    dtype = torch_dtype_for_precision(precision)
+    return {"dtype": dtype} if dtype is not None else {}
+
+
+def cast_trainable_parameters_to_fp32(model: Any) -> None:
+    _require("torch", "trainable parameter dtype normalization")
+    torch: Any = import_module("torch")
+    for parameter in model.parameters():
+        if (
+            parameter.requires_grad
+            and parameter.is_floating_point()
+            and parameter.dtype != torch.float32
+        ):
+            parameter.data = parameter.data.to(torch.float32)
+
+
 def make_lora_config(config: dict[str, Any], target_modules: list[str] | None = None) -> Any:
     _require("peft", "LoRA adapter training")
     config_class: Any = import_module("peft").LoraConfig
