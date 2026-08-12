@@ -9,7 +9,7 @@ PRESENTATION_OUT ?= dist/presentations/chsa-current-state.pptx
 
 API_URL ?=
 
-.PHONY: sync sync-training sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean train-sft-smoke train-dpo-smoke train-grpo-smoke eval-models serve-local serve-api serve-colab-dry-run eval-latency eval-robustness step3-ready presentation-html presentation-pptx presentation-ready clean
+.PHONY: sync sync-training sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean train-sft-smoke train-dpo-smoke train-grpo-smoke eval-models serve-local serve-api serve-colab-dry-run eval-latency eval-robustness step3-ready presentation-browser presentation-html presentation-pptx presentation-ready clean
 
 sync:
 	uv sync
@@ -19,6 +19,7 @@ sync-training:
 
 sync-presentation:
 	uv sync --extra presentation
+	uv run --extra presentation python -m playwright install chromium
 
 check:
 	scripts/check.sh
@@ -90,8 +91,11 @@ step3-ready: check eval-robustness eval-latency
 presentation-html:
 	uv run python scripts/export_presentation.py --input $(PRESENTATION_HTML) --dry-run
 
-presentation-pptx:
-	uv run --extra presentation python scripts/export_presentation.py --input $(PRESENTATION_HTML) --output $(PRESENTATION_OUT)
+presentation-browser:
+	uv run --extra presentation python -m playwright install chromium
+
+presentation-pptx: presentation-browser
+	uv run --extra presentation python scripts/export_presentation.py --input $(PRESENTATION_HTML) --output $(PRESENTATION_OUT) --mode rendered
 
 presentation-ready: presentation-html presentation-pptx
 

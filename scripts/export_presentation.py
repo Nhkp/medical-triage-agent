@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import html.parser
 import re
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -73,13 +74,24 @@ class DeckParser(html.parser.HTMLParser):
 
 def main() -> int:
     args = _parse_args()
-    slides = parse_deck(Path(args.input))
+    input_path = Path(args.input)
+    output_path = Path(args.output)
+    slides = parse_deck(input_path)
     if args.dry_run:
         print(f"slides={len(slides)}")
         for index, slide in enumerate(slides, start=1):
             print(f"{index}. {slide.title}")
         return 0
-    export_pptx(slides, Path(args.output))
+    if args.mode == "rendered":
+        export_rendered_pptx(
+            input_path,
+            output_path,
+            expected_slides=len(slides),
+            viewport_width=args.viewport_width,
+            viewport_height=args.viewport_height,
+        )
+    else:
+        export_text_pptx(slides, output_path)
     print(f"wrote {args.output}")
     return 0
 
@@ -92,7 +104,74 @@ def parse_deck(path: Path) -> list[Slide]:
     return parser.slides
 
 
-def export_pptx(slides: list[Slide], output_path: Path) -> None:
+def export_rendered_pptx(
+    input_path: Path,
+    output_path: Path,
+    *,
+    expected_slides: int,
+    viewport_width: int,
+    viewport_height: int,
+) -> None:
+    try:
+        from playwright.sync_api import Error as PlaywrightError
+        from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+        from playwright.sync_api import sync_playwright
+        from pptx import Presentation  # type: ignore[import-untyped]
+        from pptx.util import Inches  # type: ignore[import-untyped]
+    except ImportError as exc:
+        raise RuntimeError(
+            "Install presentation extras with `uv sync --extra presentation`."
+        ) from exc
+
+    input_uri = input_path.resolve().as_uri()
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    prs = Presentation()
+    prs.slide_width = Inches(13.333)
+    prs.slide_height = Inches(7.5)
+    blank = prs.slide_layouts[6]
+
+    with tempfile.TemporaryDirectory(prefix="medical-triage-slides-") as tmp:
+        screenshot_dir = Path(tmp)
+        try:
+            with sync_playwright() as playwright:
+                browser = playwright.chromium.launch()
+                page = browser.new_page(
+                    viewport={"width": viewport_width, "height": viewport_height},
+                    device_scale_factor=1,
+                )
+                page.goto(input_uri, wait_until="networkidle")
+                slide_locator = page.locator("section.slide")
+                slide_count = slide_locator.count()
+                if slide_count != expected_slides:
+                    raise RuntimeError(
+                        f"expected {expected_slides} rendered slides, found {slide_count}"
+                    )
+                for index in range(slide_count):
+                    locator = slide_locator.nth(index)
+                    locator.scroll_into_view_if_needed()
+                    screenshot_path = screenshot_dir / f"slide-{index + 1:02d}.png"
+                    locator.screenshot(path=str(screenshot_path))
+                    pptx_slide = prs.slides.add_slide(blank)
+                    pptx_slide.shapes.add_picture(
+                        str(screenshot_path),
+                        0,
+                        0,
+                        width=prs.slide_width,
+                        height=prs.slide_height,
+                    )
+                browser.close()
+        except (PlaywrightError, PlaywrightTimeoutError) as exc:
+            raise RuntimeError(
+                "Playwright Chromium is required for faithful HTML export. "
+                "Run `uv run --extra presentation python -m playwright install chromium`, "
+                "then retry `make presentation-pptx`."
+            ) from exc
+
+    prs.save(output_path)
+
+
+def export_text_pptx(slides: list[Slide], output_path: Path) -> None:
     try:
         from pptx import Presentation  # type: ignore[import-untyped]
         from pptx.dml.color import RGBColor  # type: ignore[import-untyped]
@@ -234,6 +313,14 @@ def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Export the HTML project presentation to PPTX")
     parser.add_argument("--input", default="presentations/chsa-current-state/index.html")
     parser.add_argument("--output", default="dist/presentations/chsa-current-state.pptx")
+    parser.add_argument(
+        "--mode",
+        choices=("rendered", "text"),
+        default="rendered",
+        help="rendered captures the real HTML/CSS; text rebuilds a lightweight fallback deck.",
+    )
+    parser.add_argument("--viewport-width", type=int, default=1600)
+    parser.add_argument("--viewport-height", type=int, default=900)
     parser.add_argument("--dry-run", action="store_true")
     return parser.parse_args()
 

@@ -35,11 +35,13 @@ def test_presentation_make_targets_are_documented() -> None:
 
     for target in (
         "sync-presentation:",
+        "presentation-browser:",
         "presentation-html:",
         "presentation-pptx:",
         "presentation-ready:",
     ):
         assert target in makefile
+    assert "--mode rendered" in makefile
 
 
 def test_presentation_export_dry_run() -> None:
