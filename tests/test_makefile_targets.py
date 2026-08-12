@@ -18,6 +18,11 @@ def test_makefile_exposes_data_preparation_targets() -> None:
         "train-dpo-smoke:",
         "train-grpo-smoke:",
         "eval-models:",
+        "serve-local:",
+        "serve-api:",
+        "eval-latency:",
+        "eval-robustness:",
+        "step3-ready:",
     ):
         assert target in makefile
 
@@ -28,3 +33,5 @@ def test_makefile_exposes_data_preparation_targets() -> None:
     assert "scripts/train_dpo.py" in makefile
     assert "scripts/train_grpo.py" in makefile
     assert "scripts/evaluate.py" in makefile
+    assert "scripts/evaluate_latency.py" in makefile
+    assert "scripts/evaluate_robustness.py" in makefile

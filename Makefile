@@ -7,7 +7,9 @@ SFT_FRENCHMEDMCQA ?= 1000
 PRESENTATION_HTML ?= presentations/chsa-current-state/index.html
 PRESENTATION_OUT ?= dist/presentations/chsa-current-state.pptx
 
-.PHONY: sync sync-training sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean train-sft-smoke train-dpo-smoke train-grpo-smoke eval-models presentation-html presentation-pptx presentation-ready clean
+API_URL ?=
+
+.PHONY: sync sync-training sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean train-sft-smoke train-dpo-smoke train-grpo-smoke eval-models serve-local serve-api eval-latency eval-robustness step3-ready presentation-html presentation-pptx presentation-ready clean
 
 sync:
 	uv sync
@@ -67,6 +69,20 @@ train-grpo-smoke:
 
 eval-models:
 	uv run scripts/evaluate.py --config configs/sft_kaggle.yaml --model base --dry-run
+
+serve-local:
+	docker compose --profile gpu up --build
+
+serve-api:
+	uv run --extra serving uvicorn medical_triage_agent.api:create_app --factory --host 0.0.0.0 --port 8080
+
+eval-latency:
+	uv run python scripts/evaluate_latency.py $(if $(API_URL),--url $(API_URL),)
+
+eval-robustness:
+	uv run python scripts/evaluate_robustness.py $(if $(API_URL),--url $(API_URL),)
+
+step3-ready: check eval-robustness eval-latency
 
 presentation-html:
 	uv run python scripts/export_presentation.py --input $(PRESENTATION_HTML) --dry-run
