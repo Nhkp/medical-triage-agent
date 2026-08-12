@@ -8,6 +8,7 @@ from medical_triage_agent.modeling import (
     OptionalDependencyError,
     detect_lora_target_modules,
     make_quantization_config,
+    torch_dtype_for_precision,
 )
 
 
@@ -31,3 +32,7 @@ def test_lora_target_detection_uses_common_projection_names() -> None:
             return [("model.layers.0.self_attn.q_proj", object()), ("lm_head", object())]
 
     assert detect_lora_target_modules(Model()) == ["q_proj"]
+
+
+def test_fp32_precision_does_not_require_torch() -> None:
+    assert torch_dtype_for_precision("fp32") is None

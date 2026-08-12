@@ -15,7 +15,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from medical_triage_agent.configuration import TrainingConfig, load_training_config
 from medical_triage_agent.contracts import SFTExample, load_jsonl
 from medical_triage_agent.formatting import render_prompt
-from medical_triage_agent.modeling import make_quantization_config, set_deterministic_seed
+from medical_triage_agent.modeling import (
+    make_quantization_config,
+    set_deterministic_seed,
+    torch_dtype_for_precision,
+)
 
 
 def main() -> int:
@@ -62,6 +66,7 @@ def run_training(
         config.model_name(),
         revision=model_config.get("revision"),
         trust_remote_code=bool(model_config.get("trust_remote_code", False)),
+        torch_dtype=torch_dtype_for_precision(config.precision()),
         quantization_config=make_quantization_config(bool(model_config.get("load_in_4bit", True))),
         device_map="auto",
     )

@@ -33,14 +33,28 @@ def make_quantization_config(load_in_4bit: bool) -> Any | None:
     if not load_in_4bit:
         return None
     _require("bitsandbytes", "4-bit QLoRA")
+    _require("torch", "4-bit QLoRA compute dtype")
     _require("transformers", "BitsAndBytesConfig")
+    torch: Any = import_module("torch")
     config_class: Any = import_module("transformers").BitsAndBytesConfig
     return config_class(
         load_in_4bit=True,
         bnb_4bit_quant_type="nf4",
         bnb_4bit_use_double_quant=True,
-        bnb_4bit_compute_dtype="float16",
+        bnb_4bit_compute_dtype=torch.float16,
     )
+
+
+def torch_dtype_for_precision(precision: str) -> Any | None:
+    if precision == "fp32":
+        return None
+    _require("torch", f"{precision} model loading")
+    torch: Any = import_module("torch")
+    if precision == "bf16":
+        return torch.bfloat16
+    if precision == "fp16":
+        return torch.float16
+    raise OptionalDependencyError(f"unsupported precision: {precision}")
 
 
 def make_lora_config(config: dict[str, Any], target_modules: list[str] | None = None) -> Any:

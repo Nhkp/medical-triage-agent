@@ -20,6 +20,7 @@ from medical_triage_agent.modeling import (
     make_lora_config,
     make_quantization_config,
     set_deterministic_seed,
+    torch_dtype_for_precision,
 )
 
 
@@ -63,6 +64,7 @@ def run_training(
         config.model_name(),
         revision=model_config.get("revision"),
         trust_remote_code=bool(model_config.get("trust_remote_code", False)),
+        torch_dtype=torch_dtype_for_precision(config.precision()),
         quantization_config=make_quantization_config(bool(model_config.get("load_in_4bit", True))),
         device_map="auto",
     )
