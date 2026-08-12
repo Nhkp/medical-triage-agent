@@ -20,6 +20,7 @@ def test_makefile_exposes_data_preparation_targets() -> None:
         "eval-models:",
         "serve-local:",
         "serve-api:",
+        "serve-colab-dry-run:",
         "eval-latency:",
         "eval-robustness:",
         "step3-ready:",
@@ -35,3 +36,4 @@ def test_makefile_exposes_data_preparation_targets() -> None:
     assert "scripts/evaluate.py" in makefile
     assert "scripts/evaluate_latency.py" in makefile
     assert "scripts/evaluate_robustness.py" in makefile
+    assert "scripts/serve_colab.py" in makefile

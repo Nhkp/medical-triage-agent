@@ -28,3 +28,25 @@ but storing it as a Colab secret is preferred.
 
 Generated datasets, adapters, checkpoints, and evaluation files stay in the Colab runtime or
 are pushed to private Hugging Face repos. Do not commit them to git.
+
+## Serving from Colab
+
+After training, install serving dependencies in the Colab runtime:
+
+```bash
+pip install -q fastapi uvicorn vllm pyngrok
+```
+
+Start vLLM and the FastAPI wrapper:
+
+```bash
+python scripts/serve_colab.py --model "$HF_DPO_MODEL_REPO"
+```
+
+Expose the FastAPI wrapper publicly when needed:
+
+```bash
+python scripts/serve_colab.py --model "$HF_DPO_MODEL_REPO" --ngrok
+```
+
+Keep the notebook cell running while testing the public URL. Stop it with `Ctrl+C`.
