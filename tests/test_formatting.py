@@ -36,9 +36,10 @@ def test_formatting_uses_tokenizer_chat_template_when_available() -> None:
 def test_dpo_formatting_preserves_preference_fields() -> None:
     row = dpo_to_training_row(_dpo_example(), tokenizer=FakeTokenizer())
 
-    assert row["chosen"] == "Consulter rapidement."
-    assert row["rejected"] == "Attendre plusieurs jours."
-    assert "user=Fievre elevee" in row["prompt"]
+    assert row["prompt"][0]["role"] == "system"
+    assert row["prompt"][1] == {"role": "user", "content": "Fievre elevee"}
+    assert row["chosen"] == [{"role": "assistant", "content": "Consulter rapidement."}]
+    assert row["rejected"] == [{"role": "assistant", "content": "Attendre plusieurs jours."}]
 
 
 def _sft_example() -> SFTExample:

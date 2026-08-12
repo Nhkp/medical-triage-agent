@@ -38,12 +38,14 @@ def dpo_to_training_row(
     tokenizer: Any | None = None,
     system_message: str | None = None,
 ) -> dict[str, Any]:
-    prompt = render_prompt(tokenizer, example.prompt, system_message=system_message)
+    # Let TRL own chat-template rendering for preference rows; pre-rendered prompt strings can
+    # make Qwen tokenization disagree when TRL later slices prompt+chosen/rejected.
+    prompt = chat_prompt_messages(example.prompt, system_message=system_message)
     return {
         "id": example.id,
         "prompt": prompt,
-        "chosen": example.chosen,
-        "rejected": example.rejected,
+        "chosen": [{"role": "assistant", "content": example.chosen}],
+        "rejected": [{"role": "assistant", "content": example.rejected}],
         "language": example.language,
         "source_ids": example.source_ids,
         "metadata": example.metadata.to_dict(),
@@ -77,6 +79,17 @@ def render_prompt(
             )
         )
     return f"System: {messages[0]['content']}\nUser: {prompt}\nAssistant:"
+
+
+def chat_prompt_messages(
+    prompt: str,
+    *,
+    system_message: str | None = None,
+) -> list[dict[str, str]]:
+    return [
+        {"role": "system", "content": system_message or DEFAULT_SYSTEM_MESSAGE},
+        {"role": "user", "content": prompt},
+    ]
 
 
 def render_chat(

@@ -39,6 +39,23 @@ def test_sft_script_passes_text_only_rows_to_trl(tmp_path: Path) -> None:
     assert "Assistant:" in rows[0]["text"]
 
 
+def test_dpo_script_passes_conversational_rows_to_trl(tmp_path: Path) -> None:
+    module = _load_script("train_dpo", Path("scripts/train_dpo.py"))
+    dataset_path = tmp_path / "dpo.jsonl"
+    dataset_path.write_text(json.dumps(_dpo_row()) + "\n", encoding="utf-8")
+
+    rows = module._load_dpo_dataset(
+        dataset_path,
+        tokenizer=None,
+        system_message=None,
+        max_samples=None,
+    )
+
+    assert rows[0]["prompt"][1] == {"role": "user", "content": "Fievre elevee"}
+    assert rows[0]["chosen"] == [{"role": "assistant", "content": "Consulter rapidement."}]
+    assert rows[0]["rejected"] == [{"role": "assistant", "content": "Attendre plusieurs jours."}]
+
+
 def test_sft_config_filters_kwargs_for_installed_trl_versions() -> None:
     module = _load_script("train_sft", Path("scripts/train_sft.py"))
 
@@ -104,6 +121,27 @@ def _sft_row() -> dict[str, object]:
             "antecedents": [],
             "vitals": {},
             "triage_level": "urgence_maximale",
+            "confidence": 0.7,
+            "source": "fixture",
+            "license": "test",
+            "transforms": [],
+        },
+    }
+
+
+def _dpo_row() -> dict[str, object]:
+    return {
+        "id": "dpo_fixture",
+        "language": "fr",
+        "prompt": "Fievre elevee",
+        "chosen": "Consulter rapidement.",
+        "rejected": "Attendre plusieurs jours.",
+        "source_ids": ["fixture"],
+        "metadata": {
+            "symptoms": ["fievre"],
+            "antecedents": [],
+            "vitals": {},
+            "triage_level": "moderee",
             "confidence": 0.7,
             "source": "fixture",
             "license": "test",
