@@ -3,172 +3,258 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>CHSA Medical Triage Agent POC</title>
+    <title>Medical Triage Agent — CHSA POC</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="deck" data-deck-title="CHSA Medical Triage Agent POC">
-      <section class="slide title" data-slide-title="CHSA Medical Triage Agent POC">
-        <p class="eyebrow">Proof of concept - current state</p>
-        <h1>CHSA Medical Triage Agent</h1>
-        <p class="subtitle">Bilingual data preparation, safety guardrails, QLoRA readiness, and API scaffold.</p>
+    <main class="deck" data-deck-title="Medical Triage Agent — CHSA POC">
+      <section class="slide title" data-slide-title="Medical Triage Agent">
+        <p class="eyebrow">Centre Hospitalier Saint-Aurélien · Proof of concept</p>
+        <h1>Medical Triage Agent</h1>
+        <p class="subtitle">
+          A bilingual, auditable and safety-oriented medical triage AI POC for clinical staff
+          support.
+        </p>
+        <div class="hero-grid" aria-hidden="true">
+          <span>Symptoms</span>
+          <span>Context</span>
+          <span>Red flags</span>
+          <span>Clinician review</span>
+        </div>
         <div class="metrics">
           <span>5,000 SFT records</span>
-          <span>1,000 DPO records</span>
-          <span>Audit passed</span>
+          <span>1,000 DPO pairs</span>
+          <span>Human-in-the-loop</span>
         </div>
-        <aside class="notes">Open with the goal: support clinical staff, not replace them.</aside>
+        <aside class="notes">
+          Open with the boundary: this is a clinician-support POC, not autonomous diagnosis.
+        </aside>
       </section>
 
-      <section class="slide split" data-slide-title="The CHSA Problem">
+      <section class="slide split" data-slide-title="The CHSA Pressure Point">
         <div>
-          <p class="eyebrow">Clinical context</p>
-          <h2>The emergency department needs faster first-pass structure</h2>
+          <p class="eyebrow">Clinical pressure</p>
+          <h2>Initial triage needs fast structure under uncertainty</h2>
+          <p class="lede">
+            CHSA’s emergency department context is overloaded: staff must gather symptoms,
+            detect escalation signals, and keep decisions traceable under time pressure.
+          </p>
         </div>
-        <ul>
-          <li>Collect symptoms with a consistent questionnaire.</li>
-          <li>Highlight red-flag cases early.</li>
-          <li>Keep human triage decisions in the loop.</li>
-          <li>Trace interactions for audit and review.</li>
-        </ul>
-        <aside class="notes">Spend one minute on why triage support matters during overload.</aside>
+        <div class="signal-stack">
+          <div><strong>Patient</strong><span>declared symptoms and context</span></div>
+          <div><strong>Pressure</strong><span>limited time, incomplete information</span></div>
+          <div><strong>Clinician</strong><span>priority decision remains human</span></div>
+        </div>
+        <aside class="notes">Use input/context.md as the mission origin.</aside>
       </section>
 
-      <section class="slide" data-slide-title="POC Boundary">
-        <p class="eyebrow">Safety boundary</p>
-        <h2>This is not an autonomous diagnosis system</h2>
+      <section class="slide compare" data-slide-title="Assist, Never Replace">
+        <p class="eyebrow">Scope and safety boundary</p>
+        <h2>Assist, never replace</h2>
+        <div class="two-column">
+          <article class="good">
+            <h3>Should support</h3>
+            <ul>
+              <li>Collect patient-declared symptoms.</li>
+              <li>Structure relevant context.</li>
+              <li>Escalate red-flag signals.</li>
+              <li>Explain priority with an audit ID.</li>
+            </ul>
+          </article>
+          <article class="risk">
+            <h3>Must not do</h3>
+            <ul>
+              <li>Make autonomous diagnoses.</li>
+              <li>Prescribe or discharge.</li>
+              <li>Hide uncertainty.</li>
+              <li>Replace clinician judgment.</li>
+            </ul>
+          </article>
+        </div>
+        <aside class="notes">This slide should be crisp. It is central to stakeholder trust.</aside>
+      </section>
+
+      <section class="slide architecture" data-slide-title="System in One Picture">
+        <p class="eyebrow">Architecture</p>
+        <h2>Auditable stages from public sources to API demo</h2>
+        <div class="pipeline">
+          <span>Verified public sources</span>
+          <span>Registry + license</span>
+          <span>SFT/DPO schemas</span>
+          <span>RGPD checks</span>
+          <span>Splits + manifest</span>
+          <span>Qwen3 base</span>
+          <span>SFT + LoRA</span>
+          <span>DPO alignment</span>
+          <span>vLLM</span>
+          <span>FastAPI + audit</span>
+        </div>
+        <p class="caption">
+          Each stage has a contract, a reproducibility command, and an explicit safety limit.
+        </p>
+        <aside class="notes">Redrawn from docs/architecture.md; no hidden black box.</aside>
+      </section>
+
+      <section class="slide" data-slide-title="Step 0: Method Before Model">
+        <p class="eyebrow">Step 0 · Design foundations</p>
+        <h2>Safety and governance were designed before training</h2>
         <div class="cards">
           <article>
-            <h3>Allowed</h3>
-            <p>Clinical-staff support, symptom collection, escalation cues, and metadata-only audit.</p>
+            <h3>SFT</h3>
+            <p>Teach the base model the expected supervised response format.</p>
           </article>
           <article>
-            <h3>Forbidden</h3>
-            <p>Final diagnosis, treatment decision, patient-facing medical device claims, and hidden uncertainty.</p>
+            <h3>DPO</h3>
+            <p>Align responses from preference pairs without a separate reward model.</p>
+          </article>
+          <article>
+            <h3>Guardrails</h3>
+            <p>Human review, privacy, provenance and non-diagnostic boundaries.</p>
           </article>
         </div>
-        <aside class="notes">Make the limitation explicit early. It builds trust.</aside>
+        <aside class="notes">Tie input/step_0.md definitions to repo guardrails.</aside>
       </section>
 
-      <section class="slide" data-slide-title="Architecture">
-        <p class="eyebrow">System view</p>
-        <h2>Auditable stages from public sources to API demo</h2>
-        <div class="flow">
-          <span>Verified sources</span>
-          <span>Data prep</span>
-          <span>SFT + LoRA</span>
-          <span>DPO</span>
-          <span>vLLM</span>
-          <span>FastAPI</span>
-        </div>
-        <p class="caption">Each stage has its own contract, audit point, and reproducibility command.</p>
-        <aside class="notes">Reference docs/architecture.md for the full Mermaid diagram.</aside>
-      </section>
-
-      <section class="slide emphasis" data-slide-title="Step 1 Completed">
-        <p class="eyebrow">Current milestone</p>
-        <h2>Step 1 is technically complete</h2>
+      <section class="slide emphasis" data-slide-title="Step 1: Dataset Built and Audited">
+        <p class="eyebrow">Step 1 · Data milestone</p>
+        <h2>The bilingual training dataset is technically complete</h2>
         <div class="big-grid">
-          <div><strong>5,000</strong><span>SFT examples</span></div>
-          <div><strong>1,000</strong><span>DPO pairs</span></div>
+          <div><strong>5,000</strong><span>SFT instruction-response records</span></div>
+          <div><strong>1,000</strong><span>DPO preference pairs</span></div>
           <div><strong>2,594</strong><span>French records</span></div>
           <div><strong>3,406</strong><span>English records</span></div>
         </div>
-        <aside class="notes">These are generated local artifacts, intentionally not committed.</aside>
+        <p class="caption">Published privately on Hugging Face with manifest and dataset card.</p>
+        <aside class="notes">Use docs/report.md counts; do not claim clinician validation.</aside>
       </section>
 
-      <section class="slide" data-slide-title="Source Governance">
-        <p class="eyebrow">Data provenance</p>
-        <h2>Every source has license and intended-use tracking</h2>
+      <section class="slide" data-slide-title="Data Governance">
+        <p class="eyebrow">Source governance</p>
+        <h2>Every source is license-checked and provenance-tracked</h2>
         <table>
-          <tr><th>Source</th><th>Use</th><th>Language</th><th>Status</th></tr>
-          <tr><td>MediQAl</td><td>SFT</td><td>FR</td><td>verified</td></tr>
-          <tr><td>FrenchMedMCQA</td><td>SFT</td><td>FR</td><td>verified</td></tr>
-          <tr><td>MedQuad</td><td>SFT filler</td><td>EN</td><td>verified</td></tr>
-          <tr><td>UltraMedical-Preference</td><td>DPO</td><td>EN</td><td>verified</td></tr>
+          <tr><th>Source</th><th>Language</th><th>Use</th><th>Status</th></tr>
+          <tr><td>MediQAl</td><td>FR</td><td>SFT / eval</td><td>verified · CC-BY-4.0</td></tr>
+          <tr><td>FrenchMedMCQA</td><td>FR</td><td>SFT / eval</td><td>verified · Apache-2.0</td></tr>
+          <tr><td>MedQuad</td><td>EN</td><td>SFT</td><td>verified · Apache-2.0</td></tr>
+          <tr><td>UltraMedical-Preference</td><td>EN</td><td>DPO</td><td>verified · MIT</td></tr>
         </table>
-        <aside class="notes">Show docs/data-sources.md after this slide if asked for evidence.</aside>
+        <aside class="notes">Emphasize public data, not CHSA hospital data.</aside>
       </section>
 
-      <section class="slide" data-slide-title="Data Pipeline">
-        <p class="eyebrow">Implementation</p>
-        <h2>The pipeline normalizes, filters, splits, and proves the dataset</h2>
-        <ul class="steps">
-          <li>Load public Hugging Face sources.</li>
-          <li>Map rows into stable SFT/DPO contracts.</li>
-          <li>Reject malformed, duplicate, or PII-positive rows.</li>
-          <li>Create deterministic train/validation/test/clinical-eval splits.</li>
-          <li>Write manifest, audit report, dataset card, and clinician review queue.</li>
-        </ul>
-        <aside class="notes">Mention that the root-cause fix rejects bad rows before split.</aside>
-      </section>
-
-      <section class="slide" data-slide-title="Audit Evidence">
-        <p class="eyebrow">RGPD-minded audit</p>
-        <h2>The generated dataset passes local safety checks</h2>
+      <section class="slide" data-slide-title="Privacy and Audit Evidence">
+        <p class="eyebrow">Privacy and RGPD-minded controls</p>
+        <h2>Automated data audit passed before publication</h2>
         <div class="big-grid three">
           <div><strong>0</strong><span>PII findings</span></div>
           <div><strong>0</strong><span>duplicates</span></div>
           <div><strong>0</strong><span>missing provenance</span></div>
         </div>
-        <p class="caption">Rejected source rows: MediQAl 763, FrenchMedMCQA 1, MedQuad 53, UltraMedical-Preference 2.</p>
-        <aside class="notes">This is an automated audit, not a clinical validation.</aside>
+        <p class="caption">
+          Rejected rows are documented: MediQAl 763, FrenchMedMCQA 1, MedQuad 53,
+          UltraMedical-Preference 2.
+        </p>
+        <aside class="notes">Automated privacy evidence is necessary but not sufficient.</aside>
       </section>
 
       <section class="slide warning" data-slide-title="Clinical Review Debt">
-        <p class="eyebrow">Clinical validation</p>
-        <h2>All public QA records still need clinician review</h2>
-        <p class="lede">The review queue contains 5,000 records because public QA/preference datasets are not CHSA triage labels.</p>
-        <ul>
-          <li>Good enough for technical SFT/DPO smoke runs.</li>
-          <li>Not enough for production triage policy.</li>
-          <li>Clinician sign-off remains a go/no-go requirement.</li>
-        </ul>
-        <aside class="notes">Do not soften this point; it is central to safety.</aside>
-      </section>
-
-      <section class="slide" data-slide-title="Training Readiness">
-        <p class="eyebrow">Next technical stage</p>
-        <h2>SFT/DPO are ready to start on a free Kaggle GPU</h2>
-        <div class="cards">
-          <article>
-            <h3>SFT</h3>
-            <p>Qwen3-1.7B-Base, 4-bit QLoRA, max length 512, batch size 1.</p>
-          </article>
-          <article>
-            <h3>DPO</h3>
-            <p>Runs after the SFT adapter exists, with conservative low-VRAM defaults.</p>
-          </article>
-          <article>
-            <h3>GRPO</h3>
-            <p>Optional proof of concept only, not required for the POC acceptance path.</p>
-          </article>
+        <p class="eyebrow">Limit made visible</p>
+        <h2>Public QA data is not CHSA triage ground truth</h2>
+        <div class="risk-ledger">
+          <div>
+            <strong>Proven locally</strong>
+            <span>schemas, splits, provenance, PII scan, API fallback checks</span>
+          </div>
+          <div>
+            <strong>Still pending</strong>
+            <span>clinician validation, final model-backed metrics, production go/no-go</span>
+          </div>
         </div>
-        <aside class="notes">Show configs/sft_kaggle.yaml if there is time.</aside>
+        <p class="lede">
+          The clinician-review queue contains 5,000 records because public QA/preference data is
+          not clinician-validated CHSA triage labeling.
+        </p>
+        <aside class="notes">Do not bury this. It is a release blocker before pilot exposure.</aside>
       </section>
 
-      <section class="slide" data-slide-title="Serving Readiness">
-        <p class="eyebrow">Demo API</p>
-        <h2>The serving layer is scaffolded before model training finishes</h2>
-        <ul>
-          <li><code>GET /health</code> for readiness.</li>
-          <li><code>POST /triage</code> for questionnaire state and symptom input.</li>
-          <li><code>GET /audit/{id}</code> for metadata-only audit review.</li>
-          <li>vLLM-compatible client path is ready for the aligned adapter.</li>
-        </ul>
-        <aside class="notes">The API exists, but final behavior depends on trained model artifacts.</aside>
+      <section class="slide" data-slide-title="Step 2: Low-VRAM Training Path">
+        <p class="eyebrow">Step 2 · SFT and alignment</p>
+        <h2>Qwen3-1.7B is adapted through a low-VRAM QLoRA path</h2>
+        <div class="model-flow">
+          <span>Qwen3-1.7B-Base</span>
+          <span>4-bit QLoRA SFT</span>
+          <span>Instruction adapter</span>
+          <span>DPO preference alignment</span>
+          <span>Aligned triage adapter</span>
+        </div>
+        <div class="cards">
+          <article><h3>Conservative defaults</h3><p>FP16, max length 512, batch size 1.</p></article>
+          <article><h3>Execution path</h3><p>Colab/Kaggle GPU first, Hub publication for artifacts.</p></article>
+          <article><h3>GRPO</h3><p>Optional POC only, not an acceptance requirement.</p></article>
+        </div>
+        <aside class="notes">Reference configs and recent DPO tokenizer fix if asked.</aside>
       </section>
 
-      <section class="slide closing" data-slide-title="Next Actions">
-        <p class="eyebrow">Decision points</p>
-        <h2>What needs to happen next</h2>
+      <section class="slide" data-slide-title="Evaluation: Technical Indicators Only">
+        <p class="eyebrow">Evaluation strategy</p>
+        <h2>Metrics support decisions; they do not prove clinical safety</h2>
+        <div class="matrix">
+          <span>Clinical safety prompts</span>
+          <span>Dangerous-advice refusal</span>
+          <span>Bilingual quality samples</span>
+          <span>Hallucination checks</span>
+          <span>Latency p50 / p95</span>
+          <span>Traceability completeness</span>
+        </div>
+        <p class="caption">Automatic metrics remain technical indicators until clinicians validate thresholds.</p>
+        <aside class="notes">Ground in docs/evaluation.md and scripts/evaluate*.py.</aside>
+      </section>
+
+      <section class="slide" data-slide-title="Step 3: Serving and Demo API">
+        <p class="eyebrow">Step 3 · Deployment path</p>
+        <h2>FastAPI wraps vLLM with stable triage and audit endpoints</h2>
+        <div class="api-map">
+          <div><strong>GET /health</strong><span>service and model readiness</span></div>
+          <div><strong>POST /triage</strong><span>symptoms → priority, explanation, audit ID</span></div>
+          <div><strong>GET /audit/{id}</strong><span>metadata-only trace, no raw patient text</span></div>
+        </div>
+        <p class="caption">
+          Fallback rules validate the API without GPU; vLLM enables model-backed explanations on
+          a GPU host or Colab runtime.
+        </p>
+        <aside class="notes">Mention docker-compose, Dockerfile and colab_serving.ipynb.</aside>
+      </section>
+
+      <section class="slide" data-slide-title="Reproducibility and CI/CD">
+        <p class="eyebrow">Engineering evidence</p>
+        <h2>The POC is operated through reproducible commands</h2>
+        <div class="command-grid">
+          <code>make check</code>
+          <code>make data-ready</code>
+          <code>make step3-ready</code>
+          <code>make serve-api</code>
+          <code>make serve-local</code>
+          <code>make presentation-pptx</code>
+        </div>
+        <p class="caption">
+          GitHub Actions runs the check gate; the deploy workflow builds the API image and
+          validates Docker Compose.
+        </p>
+        <aside class="notes">This is about repeatability and auditability, not just code volume.</aside>
+      </section>
+
+      <section class="slide closing" data-slide-title="Roadmap and Decision Gate">
+        <p class="eyebrow">Next decisions</p>
+        <h2>The next milestone is evidence, not bigger promises</h2>
         <ol>
-          <li>Configure private Hugging Face dataset publication credentials.</li>
-          <li>Run SFT smoke training on Kaggle GPU.</li>
-          <li>Run DPO only after SFT adapter output exists.</li>
-          <li>Evaluate, document metrics, then connect vLLM/FastAPI demo.</li>
+          <li>Finish SFT/DPO adapter publication and model-backed evaluation.</li>
+          <li>Run vLLM + FastAPI validation on a GPU serving runtime.</li>
+          <li>Complete clinician review of evaluation prompts and thresholds.</li>
+          <li>Decide pilot exposure only after safety, audit and latency gates pass.</li>
         </ol>
-        <p class="subtitle">Current status: data milestone complete, training milestone ready to execute.</p>
+        <p class="subtitle">
+          Current status: data milestone complete; training and serving paths are reproducible;
+          clinical validation remains pending.
+        </p>
       </section>
     </main>
   </body>

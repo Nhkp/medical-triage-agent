@@ -14,15 +14,18 @@ def test_presentation_agent_and_sources_exist() -> None:
 def test_presentation_has_15_minute_slide_count_and_required_topics() -> None:
     html = Path("presentations/chsa-current-state/index.html").read_text(encoding="utf-8")
 
-    assert html.count('class="slide') == 12
+    assert html.count('class="slide') == 14
     for topic in (
-        "The CHSA Problem",
-        "Step 1 Completed",
-        "Audit Evidence",
+        "The CHSA Pressure Point",
+        "Assist, Never Replace",
+        "System in One Picture",
+        "Step 0: Method Before Model",
+        "Step 1: Dataset Built and Audited",
+        "Privacy and Audit Evidence",
         "Clinical Review Debt",
-        "Training Readiness",
-        "Serving Readiness",
-        "Next Actions",
+        "Step 2: Low-VRAM Training Path",
+        "Step 3: Serving and Demo API",
+        "Roadmap and Decision Gate",
     ):
         assert topic in html
 
@@ -55,4 +58,4 @@ def test_presentation_export_dry_run() -> None:
         text=True,
     )
 
-    assert "slides=12" in result.stdout
+    assert "slides=14" in result.stdout
