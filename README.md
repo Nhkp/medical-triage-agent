@@ -106,6 +106,24 @@ Run the local safety evaluation:
 uv run python -m medical_triage_agent evaluate-safety
 ```
 
+Validate the local Step 3 serving path without a GPU:
+
+```bash
+make step3-ready
+```
+
+Launch the FastAPI wrapper only:
+
+```bash
+make serve-api
+```
+
+Launch the Docker Compose vLLM + FastAPI demo on a GPU host:
+
+```bash
+make serve-local
+```
+
 Validate Kaggle training and model-evaluation startup without loading weights:
 
 ```bash

@@ -107,6 +107,27 @@ make eval-models
 Current API supports a rule-based fallback and optional vLLM-compatible chat completions via
 `VLLM_BASE_URL`, `VLLM_MODEL_ID`, `VLLM_TIMEOUT_SECONDS`, and `API_KEY`.
 
+Step 3 local deployment status:
+
+- Docker Compose defines a `vllm` OpenAI-compatible model server and a FastAPI CHSA wrapper.
+- `make serve-api` runs the wrapper alone with rule-based fallback or an external vLLM URL.
+- `make serve-local` starts the local GPU-oriented Compose demo.
+- `make eval-robustness` checks empty payload handling, red-flag escalation, bilingual inputs,
+  and metadata-only audit behavior.
+- `make eval-latency` records p50/p95 latency and response-size indicators under
+  `outputs/evaluations`.
+- `make step3-ready` runs the full local gate plus robustness and latency checks.
+
+Current limitation: model-backed Step 3 metrics must be regenerated after the final SFT/DPO
+adapter repositories are available and served through vLLM. Local fallback metrics are
+technical smoke evidence only.
+
 ## Roadmap
 
-TODO: document go/no-go criteria and production requirements.
+Go/no-go before any pilot exposure:
+
+- Final SFT/DPO adapter repositories are available and versioned.
+- vLLM endpoint passes health, robustness, and latency checks with the selected adapter.
+- Audit retrieval remains metadata-only with no raw patient text.
+- Clinical reviewer signs off on evaluation prompts, thresholds, and observed failure modes.
+- Secrets, audit logs, model caches, and generated outputs remain outside git.
