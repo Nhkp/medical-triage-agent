@@ -145,4 +145,5 @@ uncertainty, escalation rules, and safety disclaimers.
 - [`docs/medical-safety.md`](docs/medical-safety.md): medical safety boundaries.
 - [`docs/evaluation.md`](docs/evaluation.md): evaluation policy and acceptance targets.
 - [`docs/kaggle-workflow.md`](docs/kaggle-workflow.md): free-GPU QLoRA workflow.
+- [`docs/colab-workflow.md`](docs/colab-workflow.md): Colab T4 QLoRA workflow.
 - [`docs/report.md`](docs/report.md): longer technical report scaffold.
