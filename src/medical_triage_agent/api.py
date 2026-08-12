@@ -35,22 +35,22 @@ def health() -> dict[str, str]:
 
 
 def create_app() -> Any:
-    from fastapi import FastAPI, HTTPException  # type: ignore[import-not-found]
+    from fastapi import FastAPI, HTTPException
 
     app = FastAPI(title="CHSA medical triage POC")
 
-    @app.get("/health")  # type: ignore[untyped-decorator]
+    @app.get("/health")
     def health_endpoint() -> dict[str, str]:
         return health()
 
-    @app.post("/triage")  # type: ignore[untyped-decorator]
+    @app.post("/triage")
     def triage_endpoint(payload: dict[str, Any]) -> dict[str, str]:
         try:
             return triage(payload)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    @app.get("/audit/{audit_id}")  # type: ignore[untyped-decorator]
+    @app.get("/audit/{audit_id}")
     def audit_endpoint(audit_id: str) -> dict[str, Any]:
         record = audit(audit_id)
         if record is None:
