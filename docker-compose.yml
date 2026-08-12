@@ -6,7 +6,6 @@ services:
       HF_TOKEN: ${HF_TOKEN:-}
     ports:
       - "8000:8000"
-    profiles: ["gpu"]
     deploy:
       resources:
         reservations:
@@ -18,7 +17,7 @@ services:
   api:
     build: .
     environment:
-      VLLM_BASE_URL: ${VLLM_BASE_URL:-http://vllm:8000/v1}
+      VLLM_BASE_URL: ${COMPOSE_VLLM_BASE_URL:-http://vllm:8000/v1}
       VLLM_MODEL_ID: ${VLLM_MODEL_ID:-Qwen/Qwen3-1.7B-Base}
       VLLM_TIMEOUT_SECONDS: ${VLLM_TIMEOUT_SECONDS:-30}
       API_KEY: ${API_KEY:-}

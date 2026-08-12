@@ -13,4 +13,4 @@ jobs:
       - uses: actions/checkout@v5
       - uses: docker/setup-buildx-action@v4
       - run: docker build -t medical-triage-agent-demo .
-      - run: docker compose config
+      - run: docker compose --env-file .env.example config
