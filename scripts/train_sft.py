@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import sys
 from pathlib import Path
@@ -82,7 +83,8 @@ def run_training(
         train_dataset=Dataset.from_list(train_dataset),
         eval_dataset=Dataset.from_list(eval_dataset),
         peft_config=make_lora_config(values["lora"], detect_lora_target_modules(model)),
-        args=SFTConfig(
+        args=_make_sft_config(
+            SFTConfig,
             output_dir=str(config.output_dir()),
             max_length=config.max_seq_length(),
             dataset_text_field="text",
@@ -127,6 +129,14 @@ def _load_sft_dataset(
         for row in load_jsonl(str(path))
     ]
     return rows[:max_samples] if max_samples is not None else rows
+
+
+def _make_sft_config(config_class: Any, **kwargs: Any) -> Any:
+    supported = set(inspect.signature(config_class).parameters)
+    filtered = {key: value for key, value in kwargs.items() if key in supported}
+    if "eval_strategy" in kwargs and "evaluation_strategy" in supported:
+        filtered["evaluation_strategy"] = kwargs["eval_strategy"]
+    return config_class(**filtered)
 
 
 def _parse_args() -> argparse.Namespace:

@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import inspect
 import json
 import sys
 from pathlib import Path
@@ -80,7 +81,8 @@ def run_training(
         model=model,
         reward_funcs=[_medical_safety_reward],
         train_dataset=Dataset.from_list(dataset),
-        args=GRPOConfig(
+        args=_make_grpo_config(
+            GRPOConfig,
             output_dir=str(config.output_dir()),
             max_completion_length=config.max_seq_length(),
             beta=grpo_config["beta"],
@@ -134,6 +136,11 @@ def _medical_safety_reward(completions: list[str], **_: Any) -> list[float]:
         )
         for completion in completions
     ]
+
+
+def _make_grpo_config(config_class: Any, **kwargs: Any) -> Any:
+    supported = set(inspect.signature(config_class).parameters)
+    return config_class(**{key: value for key, value in kwargs.items() if key in supported})
 
 
 def _parse_args() -> argparse.Namespace:
