@@ -55,3 +55,13 @@ def test_config_rejects_conflicting_precision() -> None:
             overrides={"training.bf16": True},
             require_files=False,
         )
+
+
+def test_push_to_hub_requires_actionable_model_id() -> None:
+    with pytest.raises(ConfigurationError, match="--hub-model-id <namespace/model-repo>"):
+        load_training_config(
+            "configs/sft_kaggle.yaml",
+            method="sft",
+            overrides={"training.push_to_hub": True, "training.hub_model_id": None},
+            require_files=False,
+        )

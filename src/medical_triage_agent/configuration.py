@@ -85,7 +85,9 @@ def validate_training_config(config: TrainingConfig, *, require_files: bool = Tr
 
     if bool(training.get("push_to_hub")) and not training.get("hub_model_id"):
         raise ConfigurationError(
-            "training.hub_model_id is required when training.push_to_hub is true"
+            "training.hub_model_id is required when training.push_to_hub is true; "
+            "either remove --push-to-hub for a local run or pass "
+            "--hub-model-id <namespace/model-repo>"
         )
 
     if bool(training.get("bf16")) and bool(training.get("fp16")):
