@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import os
+import re
+import unicodedata
 from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -79,4 +81,28 @@ def _extract_content(payload: dict[str, Any]) -> str | None:
     if not isinstance(message, dict):
         return None
     content = message.get("content")
-    return content if isinstance(content, str) and content.strip() else None
+    if not isinstance(content, str):
+        return None
+    explanation = content.strip()
+    return explanation if _valid_explanation(explanation) else None
+
+
+def _valid_explanation(explanation: str) -> bool:
+    if not 20 <= len(explanation) <= 800:
+        return False
+    if re.search(r"(.)\1{7,}", explanation):
+        return False
+    return not any(_is_unexpected_script(character) for character in explanation)
+
+
+def _is_unexpected_script(character: str) -> bool:
+    if (
+        character.isascii()
+        or character.isspace()
+        or unicodedata.category(character).startswith("P")
+    ):
+        return False
+    name = unicodedata.name(character, "")
+    if "LATIN" in name:
+        return False
+    return unicodedata.category(character).startswith(("L", "M"))

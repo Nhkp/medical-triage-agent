@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from pytest import MonkeyPatch
+
 from medical_triage_agent import api
 from medical_triage_agent.triage import DISCLAIMER, assess_triage
+from medical_triage_agent.vllm_client import _extract_content
 
 
 def test_red_flag_symptom_escalates_to_urgence_maximale() -> None:
@@ -34,3 +37,21 @@ def test_api_rejects_empty_symptom_payload() -> None:
         assert "symptoms" in str(exc)
     else:
         raise AssertionError("empty symptoms should be rejected")
+
+
+def test_invalid_vllm_explanation_falls_back(monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.setenv("VLLM_BASE_URL", "http://vllm.test/v1")
+    monkeypatch.setattr(api, "generate_explanation", lambda _payload, _response: None)
+
+    response = api.triage({"symptoms": ["douleur thoracique", "difficulte respiratoire"]})
+
+    assert response["priority"] == "urgence_maximale"
+    assert (
+        response["explanation"] == "Symptomes d'alerte detectes: revue clinique immediate requise."
+    )
+
+
+def test_vllm_rejects_non_latin_repetitive_output() -> None:
+    payload = {"choices": [{"message": {"content": "具有战士ันันันันันันันันันันันันันันันันันันันันันันันัน"}}]}
+
+    assert _extract_content(payload) is None
