@@ -21,6 +21,7 @@ def test_makefile_exposes_data_preparation_targets() -> None:
         "serve-local:",
         "serve-api:",
         "serve-colab-dry-run:",
+        "serve-kaggle-dry-run:",
         "eval-latency:",
         "eval-robustness:",
         "step3-ready:",
