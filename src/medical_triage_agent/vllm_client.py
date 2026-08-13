@@ -31,7 +31,8 @@ def generate_explanation(payload: dict[str, Any], response: TriageResponse) -> s
                 "role": "system",
                 "content": (
                     "You are a medical triage POC assistant for clinicians. Explain the "
-                    "triage priority conservatively and include human review."
+                    "triage priority conservatively and include human review. Use only "
+                    "French when the user query is in French, otherwise use English. Avoid using any other language."
                 ),
             },
             {
