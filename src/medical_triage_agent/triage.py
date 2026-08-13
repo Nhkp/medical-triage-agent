@@ -16,6 +16,10 @@ DISCLAIMER = (
 RED_FLAGS = (
     "chest pain",
     "douleur thoracique",
+    "heart attack",
+    "myocardial infarction",
+    "infarctus",
+    "crise cardiaque",
     "difficulty breathing",
     "difficulte respiratoire",
     "shortness of breath",
