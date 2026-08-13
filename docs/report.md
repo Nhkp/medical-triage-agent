@@ -70,12 +70,58 @@ committed to git.
 
 ## Training
 
-Current status:
+Current status: completed for the Step 2 technical milestone.
 
-- Kaggle-oriented QLoRA configuration exists for SFT, DPO, and optional GRPO.
-- Training scripts support CPU-safe dry runs, YAML configs, CLI overrides, adapter outputs,
-  and checkpoint resume arguments.
-- Full SFT/DPO runs remain TODO until generated data and GPU runtime are available.
+- The SFT and DPO full runs were executed from the Colab/T4 training notebook.
+- Training used the Kaggle/Colab-oriented 4-bit QLoRA path with Qwen3-1.7B-Base, LoRA
+  adapters, fixed YAML configs, and the generated SFT/DPO JSONL splits.
+- CPU-safe smoke commands remain available for startup validation, but the recorded metrics
+  below come from full 1-epoch GPU runs.
+
+Published adapter repositories:
+
+- SFT adapter: <https://huggingface.co/Lokhidor/medical-triage-qwen3-sft-lora>
+- DPO adapter: <https://huggingface.co/Lokhidor/medical-triage-qwen3-dpo-lora>
+
+SFT run summary:
+
+| metric | value |
+| --- | ---: |
+| epochs | `1` |
+| train runtime | `3,660s` (~61 min) |
+| train samples/second | `1.093` |
+| train steps/second | `0.137` |
+| train loss | `1.445` |
+| eval loss | `1.294` |
+| eval mean token accuracy | `0.7176` |
+| eval runtime | `102.4s` |
+| eval samples/second | `4.785` |
+
+DPO run summary:
+
+| metric | value |
+| --- | ---: |
+| epochs | `1` |
+| train runtime | `1,314s` (~22 min) |
+| train samples/second | `0.595` |
+| train steps/second | `0.075` |
+| train loss | `0.5962` |
+| eval loss | `0.5695` |
+| eval mean token accuracy | `0.7074` |
+| eval rewards accuracy | `0.7091` |
+| eval rewards margin | `0.4726` |
+| eval rewards chosen | `0.02491` |
+| eval rewards rejected | `-0.4477` |
+| eval runtime | `82.8s` |
+
+Interpretation:
+
+- The SFT run shows the model learned the supervised response format over the prepared
+  dataset, with validation token accuracy around `0.72`.
+- The DPO run shows the preference objective separating chosen from rejected answers on the
+  validation split, with positive reward margin and roughly `0.71` reward accuracy.
+- These are technical training indicators only. They do not prove clinical safety,
+  diagnostic validity, or CHSA protocol compliance.
 
 Smoke commands:
 
@@ -93,8 +139,13 @@ Current local safety evaluation command:
 uv run python -m medical_triage_agent evaluate-safety
 ```
 
-TODO: add model-backed safety, hallucination, bilingual quality, latency, and traceability
-metrics after smoke training.
+Current model-backed evaluation status:
+
+- Training losses and preference metrics are recorded from the Colab full runs.
+- Base vs SFT vs DPO deterministic generation evaluation remains to be run against the
+  published adapters.
+- Clinical safety, hallucination, bilingual quality, latency, and traceability metrics must be
+  regenerated against the served DPO adapter before the final go/no-go decision.
 
 Deterministic model-evaluation entrypoint:
 
@@ -111,6 +162,7 @@ Step 3 local deployment status:
 
 - Docker Compose defines a `vllm` OpenAI-compatible model server and a FastAPI CHSA wrapper.
 - `make serve-api` runs the wrapper alone with rule-based fallback or an external vLLM URL.
+- Local FastAPI serving without vLLM has been exercised successfully.
 - `make serve-local` starts the local GPU-oriented Compose demo.
 - `make eval-robustness` checks empty payload handling, red-flag escalation, bilingual inputs,
   and metadata-only audit behavior.
@@ -118,9 +170,9 @@ Step 3 local deployment status:
   `outputs/evaluations`.
 - `make step3-ready` runs the full local gate plus robustness and latency checks.
 
-Current limitation: model-backed Step 3 metrics must be regenerated after the final SFT/DPO
-adapter repositories are available and served through vLLM. Local fallback metrics are
-technical smoke evidence only.
+Current limitation: vLLM plus FastAPI still needs to be tested on Colab/T4 or another GPU
+runtime with the published DPO adapter. Local non-vLLM serving and in-process fallback metrics
+are useful smoke evidence, but they are not the final model-backed latency/robustness result.
 
 ## Roadmap
 
