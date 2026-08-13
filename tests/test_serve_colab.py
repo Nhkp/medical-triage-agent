@@ -10,7 +10,10 @@ from typing import Any
 def test_serve_colab_dry_run_commands_are_colab_friendly() -> None:
     module = _load_script("serve_colab", Path("scripts/serve_colab.py"))
     args = argparse.Namespace(
-        model="Lokhidor/chsa-qwen3-dpo-lora",
+        model=None,
+        base_model="Qwen/Qwen3-1.7B-Base",
+        adapter="Lokhidor/chsa-qwen3-dpo-lora",
+        lora_name="medical-triage-dpo",
         host="127.0.0.1",
         vllm_port=8000,
         api_port=8080,
@@ -20,7 +23,13 @@ def test_serve_colab_dry_run_commands_are_colab_friendly() -> None:
 
     assert commands["vllm"][:3] == [sys.executable, "-m", "vllm.entrypoints.openai.api_server"]
     assert "--model" in commands["vllm"]
-    assert "Lokhidor/chsa-qwen3-dpo-lora" in commands["vllm"]
+    assert "Qwen/Qwen3-1.7B-Base" in commands["vllm"]
+    assert "--enable-lora" in commands["vllm"]
+    assert "--lora-modules" in commands["vllm"]
+    assert "medical-triage-dpo=Lokhidor/chsa-qwen3-dpo-lora" in commands["vllm"]
+    assert (
+        "Lokhidor/chsa-qwen3-dpo-lora" not in commands["vllm"][: commands["vllm"].index("--host")]
+    )
     assert "uvicorn" in commands["api"]
     assert "medical_triage_agent.api:create_app" in commands["api"]
 

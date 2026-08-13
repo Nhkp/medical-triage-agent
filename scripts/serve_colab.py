@@ -38,19 +38,34 @@ def main() -> int:
 
 
 def build_commands(args: argparse.Namespace, repo_root: Path) -> dict[str, list[str]]:
-    model_id = args.model or os.environ.get("VLLM_MODEL_ID") or "Qwen/Qwen3-1.7B-Base"
+    base_model = (
+        args.base_model
+        or os.environ.get("VLLM_BASE_MODEL_ID")
+        or os.environ.get("VLLM_MODEL_ID")
+        or "Qwen/Qwen3-1.7B-Base"
+    )
+    adapter = args.adapter or args.model or os.environ.get("VLLM_LORA_ADAPTER")
+    vllm_command = [
+        sys.executable,
+        "-m",
+        "vllm.entrypoints.openai.api_server",
+        "--model",
+        base_model,
+        "--host",
+        args.host,
+        "--port",
+        str(args.vllm_port),
+    ]
+    if adapter:
+        vllm_command.extend(
+            [
+                "--enable-lora",
+                "--lora-modules",
+                f"{args.lora_name}={adapter}",
+            ]
+        )
     return {
-        "vllm": [
-            sys.executable,
-            "-m",
-            "vllm.entrypoints.openai.api_server",
-            "--model",
-            model_id,
-            "--host",
-            args.host,
-            "--port",
-            str(args.vllm_port),
-        ],
+        "vllm": vllm_command,
         "api": [
             sys.executable,
             "-m",
@@ -70,7 +85,14 @@ def _env(args: argparse.Namespace, repo_root: Path) -> dict[str, str]:
     env = os.environ.copy()
     env["PYTHONPATH"] = str(repo_root / "src")
     env["VLLM_BASE_URL"] = f"http://{args.host}:{args.vllm_port}/v1"
-    env["VLLM_MODEL_ID"] = args.model or env.get("VLLM_MODEL_ID", "Qwen/Qwen3-1.7B-Base")
+    adapter = args.adapter or args.model or env.get("VLLM_LORA_ADAPTER")
+    env["VLLM_MODEL_ID"] = (
+        args.lora_name
+        if adapter
+        else args.base_model
+        or env.get("VLLM_BASE_MODEL_ID")
+        or env.get("VLLM_MODEL_ID", "Qwen/Qwen3-1.7B-Base")
+    )
     env.setdefault("VLLM_TIMEOUT_SECONDS", "30")
     return env
 
@@ -138,7 +160,10 @@ def _terminate(process: subprocess.Popen[str]) -> None:
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Serve vLLM + FastAPI from a Colab GPU runtime")
-    parser.add_argument("--model", help="Hugging Face model or adapter repo to serve")
+    parser.add_argument("--model", help="Backward-compatible alias for --adapter")
+    parser.add_argument("--base-model", help="Hugging Face base model loaded by vLLM")
+    parser.add_argument("--adapter", help="Hugging Face LoRA adapter repo served by vLLM")
+    parser.add_argument("--lora-name", default="medical-triage", help="OpenAI model name for LoRA")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--vllm-port", type=int, default=8000)
     parser.add_argument("--api-port", type=int, default=8080)
