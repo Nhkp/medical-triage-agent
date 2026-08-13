@@ -55,6 +55,11 @@ def build_commands(args: argparse.Namespace, repo_root: Path) -> dict[str, list[
         args.host,
         "--port",
         str(args.vllm_port),
+        "--gpu-memory-utilization",
+        "0.70",
+        "--max-model-len",
+        "4096",
+        "--enforce-eager",
     ]
     if adapter:
         vllm_command.extend(
