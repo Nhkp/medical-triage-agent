@@ -9,13 +9,16 @@ PRESENTATION_OUT ?= dist/presentations/chsa-current-state.pptx
 
 API_URL ?=
 
-.PHONY: sync sync-training sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean train-sft-smoke train-dpo-smoke train-grpo-smoke eval-models serve-local serve-api serve-colab-dry-run serve-kaggle-dry-run eval-latency eval-robustness step3-ready presentation-browser presentation-html presentation-pptx presentation-ready clean
+.PHONY: sync sync-training sync-ui sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean train-sft-smoke train-dpo-smoke train-grpo-smoke eval-models serve-local serve-api serve-ui serve-colab-dry-run serve-kaggle-dry-run eval-latency eval-robustness step3-ready presentation-browser presentation-html presentation-pptx presentation-ready clean
 
 sync:
 	uv sync
 
 sync-training:
 	uv sync --extra training
+
+sync-ui:
+	uv sync --extra ui
 
 sync-presentation:
 	uv sync --extra presentation
@@ -76,6 +79,9 @@ serve-local:
 
 serve-api:
 	uv run --extra serving uvicorn medical_triage_agent.api:create_app --factory --host 0.0.0.0 --port 8080
+
+serve-ui:
+	uv run --extra ui streamlit run src/medical_triage_agent/streamlit_interface.py
 
 serve-colab-dry-run:
 	uv run python scripts/serve_colab.py --dry-run

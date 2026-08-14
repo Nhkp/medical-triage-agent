@@ -8,6 +8,7 @@ def test_makefile_exposes_data_preparation_targets() -> None:
 
     for target in (
         "sync-training:",
+        "sync-ui:",
         "data-build:",
         "data-audit:",
         "data-card:",
@@ -20,6 +21,7 @@ def test_makefile_exposes_data_preparation_targets() -> None:
         "eval-models:",
         "serve-local:",
         "serve-api:",
+        "serve-ui:",
         "serve-colab-dry-run:",
         "serve-kaggle-dry-run:",
         "eval-latency:",

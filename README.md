@@ -45,7 +45,7 @@ wrapper owns domain validation, safety disclaimers, metadata-only audit traces, 
 The global flow is documented in [`docs/architecture.md`](docs/architecture.md): verified
 public medical sources feed the data-preparation pipeline, SFT produces an instruction-tuned
 adapter/model, DPO produces the aligned medical-triage model, and vLLM plus FastAPI expose the
-demo endpoint with audit metadata and safety evaluation.
+demonstration API with audit metadata and safety evaluation.
 
 ## Current Results
 
@@ -118,17 +118,14 @@ Launch the FastAPI wrapper only:
 make serve-api
 ```
 
-Open the built-in FastAPI demo console:
+Use the optional Streamlit API tester in a second terminal:
 
-```text
-http://127.0.0.1:8080/demo
+```bash
+make serve-ui
 ```
 
-For a Kaggle/ngrok serving session, open:
-
-```text
-https://your-ngrok-url.ngrok-free.dev/demo
-```
+The tester defaults to `http://127.0.0.1:8080`; change the sidebar URL to your
+Kaggle/ngrok FastAPI URL when testing a remote session.
 
 Launch the Docker Compose vLLM + FastAPI demo on a GPU host:
 
