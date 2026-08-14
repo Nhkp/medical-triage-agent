@@ -134,7 +134,7 @@ def test_valid_vllm_explanation_is_used(monkeypatch: MonkeyPatch) -> None:
     assert "suggested_priority" in audit_record["llm_response_preview"]
 
 
-def test_llm_can_escalate_non_red_flag_priority(monkeypatch: MonkeyPatch) -> None:
+def test_llm_priority_mismatch_uses_rule_fallback(monkeypatch: MonkeyPatch) -> None:
     explanation = (
         "Cette situation justifie une evaluation clinique urgente malgre l'absence de red flag exact. "
         "Les elements restent declaratifs et doivent etre verifies par un soignant."
@@ -149,11 +149,16 @@ def test_llm_can_escalate_non_red_flag_priority(monkeypatch: MonkeyPatch) -> Non
 
     response = api.triage({"symptoms": ["malaise important"]})
 
-    assert response["priority"] == "urgence_maximale"
+    assert response["priority"] == "moderee"
     assert response["rule_priority"] == "moderee"
     assert response["llm_priority"] == "urgence_maximale"
-    assert response["priority_source"] == "llm"
-    assert response["arbitration"] == "llm_escalated"
+    assert response["priority_source"] == "rule"
+    assert response["arbitration"] == "llm_priority_mismatch"
+    assert response["explanation_source"] == "fallback"
+    assert (
+        response["explanation"]
+        == "Aucun symptome d'alerte v1 detecte; revue clinique necessaire pour confirmer."
+    )
 
 
 def test_rules_override_lower_llm_priority_for_red_flag(monkeypatch: MonkeyPatch) -> None:
@@ -173,7 +178,8 @@ def test_rules_override_lower_llm_priority_for_red_flag(monkeypatch: MonkeyPatch
     assert response["rule_priority"] == "urgence_maximale"
     assert response["llm_priority"] == "differee"
     assert response["priority_source"] == "rule"
-    assert response["arbitration"] == "rule_escalated"
+    assert response["arbitration"] == "llm_priority_mismatch"
+    assert response["explanation_source"] == "fallback"
 
 
 def test_repaired_vllm_output_can_be_used_by_api(monkeypatch: MonkeyPatch) -> None:
@@ -191,14 +197,14 @@ def test_repaired_vllm_output_can_be_used_by_api(monkeypatch: MonkeyPatch) -> No
     monkeypatch.setenv("VLLM_BASE_URL", "http://vllm.test/v1")
     monkeypatch.setattr("medical_triage_agent.vllm_client.urlopen", fake_urlopen)
 
-    response = api.triage({"symptoms": ["malaise important"]})
+    response = api.triage({"symptoms": ["douleur thoracique"]})
     audit_record = api.audit(response["audit_id"])
 
     assert response["priority"] == "urgence_maximale"
-    assert response["rule_priority"] == "moderee"
+    assert response["rule_priority"] == "urgence_maximale"
     assert response["llm_priority"] == "urgence_maximale"
-    assert response["priority_source"] == "llm"
-    assert response["arbitration"] == "llm_escalated"
+    assert response["priority_source"] == "shared"
+    assert response["arbitration"] == "matched"
     assert response["explanation_source"] == "llm"
     assert response["llm_status"] == "accepted_repaired"
     assert audit_record is not None
@@ -225,8 +231,8 @@ def test_repaired_vllm_output_cannot_lower_red_flag_priority(monkeypatch: Monkey
     assert response["rule_priority"] == "urgence_maximale"
     assert response["llm_priority"] == "differee"
     assert response["priority_source"] == "rule"
-    assert response["arbitration"] == "rule_escalated"
-    assert response["explanation_source"] == "llm"
+    assert response["arbitration"] == "llm_priority_mismatch"
+    assert response["explanation_source"] == "fallback"
     assert response["llm_status"] == "accepted_repaired"
 
 
@@ -425,6 +431,37 @@ def test_vllm_rejects_object_that_copies_rule_fallback_explanation() -> None:
     payload = {"choices": [{"message": {"content": content}}]}
 
     assert extract_explanation(payload).llm_status == "invalid_output"
+
+
+def test_api_uses_rule_fallback_when_repaired_llm_priority_differs(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    content = (
+        "taxpipeline: symptoms_to_priority\n\n"
+        "Reponse: urgence_maximale\n\n"
+        "Explication: Les céphalées et le nez qui coule demandent une revue clinique. "
+        "Le niveau propose par le modele reste incertain et doit etre confirme."
+    )
+    payload = {"choices": [{"message": {"content": content}}]}
+
+    def fake_urlopen(_request: Any, timeout: float | None) -> _Response:
+        return _Response(json.dumps(payload).encode("utf-8"))
+
+    monkeypatch.setenv("VLLM_BASE_URL", "http://vllm.test/v1")
+    monkeypatch.setattr("medical_triage_agent.vllm_client.urlopen", fake_urlopen)
+
+    response = api.triage({"symptoms": ["céphalées", "nez qui coule"]})
+
+    assert response["priority"] == "moderee"
+    assert response["rule_priority"] == "moderee"
+    assert response["llm_priority"] == "urgence_maximale"
+    assert response["priority_source"] == "rule"
+    assert response["arbitration"] == "llm_priority_mismatch"
+    assert response["explanation_source"] == "fallback"
+    assert (
+        response["explanation"]
+        == "Aucun symptome d'alerte v1 detecte; revue clinique necessaire pour confirmer."
+    )
 
 
 def test_api_uses_repaired_separator_corrupted_output(monkeypatch: MonkeyPatch) -> None:
