@@ -565,6 +565,62 @@ def test_vllm_repairs_repeated_explanation_by_deduplicating_sentences() -> None:
     )
 
 
+def test_vllm_repairs_repeated_sentence_blocks_by_keeping_first_iteration() -> None:
+    payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "suggested_priority": "moderee",
+                            "explanation": (
+                                "La respiration declaree est normale. "
+                                "Les symptomes restent a confirmer par un clinicien. "
+                                "Une surveillance clinique reste appropriee. "
+                                "La respiration declaree est normale. "
+                                "Les symptomes restent a confirmer par un clinicien. "
+                                "Une surveillance clinique reste appropriee."
+                            ),
+                            "confidence": 0.5,
+                        },
+                        ensure_ascii=False,
+                    )
+                }
+            }
+        ]
+    }
+
+    result = extract_explanation(payload)
+
+    assert result.llm_status == "accepted_repaired"
+    assert result.suggested_priority == "moderee"
+    assert result.explanation == (
+        "La respiration declaree est normale. "
+        "Les symptomes restent a confirmer par un clinicien. "
+        "Une surveillance clinique reste appropriee."
+    )
+
+
+def test_vllm_bad_response_when_lng_contains_explanation_without_priority() -> None:
+    payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": (
+                        '{lng: "La respiration est normale. Le patient est apyrétique. '
+                        "Il n'a pas de signes d'infection pulmonaire.\"}"
+                    )
+                }
+            }
+        ]
+    }
+
+    result = extract_explanation(payload)
+
+    assert result.llm_status == "bad_response"
+    assert result.suggested_priority is None
+
+
 def test_vllm_rejects_repeated_explanation_when_deduplication_is_too_short() -> None:
     payload = {
         "choices": [

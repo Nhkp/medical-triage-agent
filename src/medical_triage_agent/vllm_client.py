@@ -451,6 +451,7 @@ def _deduplicate_repeated_sentences(explanation: str) -> tuple[str, bool]:
     sentences = _sentences(explanation)
     if not sentences:
         return explanation, False
+    sentences, block_deduplicated = _deduplicate_repeated_sentence_blocks(sentences)
     kept: list[str] = []
     seen: set[str] = set()
     deduplicated = False
@@ -465,8 +466,39 @@ def _deduplicate_repeated_sentences(explanation: str) -> tuple[str, bool]:
         seen.add(normalized)
         kept.append(sentence)
     if not deduplicated:
-        return explanation, False
+        return (" ".join(sentences), True) if block_deduplicated else (explanation, False)
     return " ".join(kept), True
+
+
+def _deduplicate_repeated_sentence_blocks(sentences: list[str]) -> tuple[list[str], bool]:
+    normalized = [_normalized_sentence(sentence) for sentence in sentences]
+    kept: list[str] = []
+    changed = False
+    index = 0
+    while index < len(sentences):
+        block_size = _repeated_block_size(normalized, index)
+        if block_size is None:
+            kept.append(sentences[index])
+            index += 1
+            continue
+        kept.extend(sentences[index : index + block_size])
+        index += block_size
+        while normalized[index : index + block_size] == normalized[index - block_size : index]:
+            changed = True
+            index += block_size
+    return kept, changed
+
+
+def _repeated_block_size(normalized: list[str], index: int) -> int | None:
+    remaining = len(normalized) - index
+    for block_size in range(1, remaining // 2 + 1):
+        block = normalized[index : index + block_size]
+        if not all(block):
+            continue
+        next_block = normalized[index + block_size : index + (block_size * 2)]
+        if block == next_block:
+            return block_size
+    return None
 
 
 def _sentences(explanation: str) -> list[str]:
