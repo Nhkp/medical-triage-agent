@@ -10,6 +10,30 @@ from urllib.request import Request, urlopen
 
 from medical_triage_agent.triage import TriageResponse
 
+SYSTEM_PROMPT = (
+    "You are a CHSA medical triage proof-of-concept assistant for clinical staff. "
+    "Your role is only to explain the triage priority already provided by the backend; "
+    "do not change, contradict, or replace that priority. "
+    "Answer in the same language as the symptoms: French for French input, English otherwise. "
+    "Use only Latin-script French or English. Do not use any other language or script. "
+    "Do not provide a diagnosis, medication, dosage, or home-treatment instructions. "
+    "Mention uncertainty and that human clinical review remains required. "
+    "If the priority is urgence_maximale, explicitly mention immediate clinical review or escalation. "
+    "Write 2 to 4 short sentences. Do not use markdown, bullets, or JSON."
+)
+
+_OPTIONAL_CONTEXT_KEYS = (
+    "questionnaire",
+    "questionnaire_state",
+    "answers",
+    "vitals",
+    "antecedents",
+    "age",
+    "sex",
+    "gender",
+    "language",
+)
+
 
 def configured_model() -> str:
     return os.environ.get("VLLM_MODEL_ID", "rule_based_v1")
@@ -24,29 +48,7 @@ def generate_explanation(payload: dict[str, Any], response: TriageResponse) -> s
     if not base_url:
         return None
 
-    request_payload = {
-        "model": configured_model(),
-        "messages": [
-            {
-                "role": "system",
-                "content": (
-                    "You are a medical triage POC assistant for clinicians. Explain the "
-                    "triage priority conservatively and include human review. Use only "
-                    "French when the user query is in French, otherwise use English. Avoid using any other language."
-                ),
-            },
-            {
-                "role": "user",
-                "content": json.dumps(
-                    {"request": payload, "priority": response.priority},
-                    ensure_ascii=False,
-                    sort_keys=True,
-                ),
-            },
-        ],
-        "temperature": 0,
-        "max_tokens": 160,
-    }
+    request_payload = build_chat_request(payload, response)
     data = json.dumps(request_payload).encode("utf-8")
     request = Request(
         f"{base_url.rstrip('/')}/chat/completions",
@@ -61,6 +63,37 @@ def generate_explanation(payload: dict[str, Any], response: TriageResponse) -> s
         return None
 
     return _extract_content(response_payload)
+
+
+def build_chat_request(payload: dict[str, Any], response: TriageResponse) -> dict[str, Any]:
+    return {
+        "model": configured_model(),
+        "messages": [
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT,
+            },
+            {
+                "role": "user",
+                "content": json.dumps(
+                    _model_context(payload, response), ensure_ascii=False, sort_keys=True
+                ),
+            },
+        ],
+        "temperature": 0,
+        "max_tokens": 160,
+    }
+
+
+def _model_context(payload: dict[str, Any], response: TriageResponse) -> dict[str, Any]:
+    context: dict[str, Any] = {
+        "symptoms": payload.get("symptoms", []),
+        "priority": response.priority,
+    }
+    for key in _OPTIONAL_CONTEXT_KEYS:
+        if key in payload:
+            context[key] = payload[key]
+    return context
 
 
 def _headers() -> dict[str, str]:
@@ -93,7 +126,25 @@ def _valid_explanation(explanation: str) -> bool:
         return False
     if re.search(r"(.)\1{7,}", explanation):
         return False
-    return not any(_is_unexpected_script(character) for character in explanation)
+    if any(_is_unexpected_script(character) for character in explanation):
+        return False
+    return not _contains_forbidden_advice(explanation)
+
+
+def _contains_forbidden_advice(explanation: str) -> bool:
+    lowered = explanation.casefold()
+    forbidden_fragments = (
+        "diagnosis is",
+        "diagnostic est",
+        "diagnostique est",
+        "take ",
+        "prenez ",
+        "donnez ",
+        "administer ",
+    )
+    return any(fragment in lowered for fragment in forbidden_fragments) or bool(
+        re.search(r"\b\d+\s*(mg|ml)\b", lowered)
+    )
 
 
 def _is_unexpected_script(character: str) -> bool:

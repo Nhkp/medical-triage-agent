@@ -4,7 +4,7 @@ from pytest import MonkeyPatch
 
 from medical_triage_agent import api
 from medical_triage_agent.triage import DISCLAIMER, assess_triage
-from medical_triage_agent.vllm_client import _extract_content
+from medical_triage_agent.vllm_client import SYSTEM_PROMPT, _extract_content, build_chat_request
 
 
 def test_red_flag_symptom_escalates_to_urgence_maximale() -> None:
@@ -61,3 +61,76 @@ def test_vllm_rejects_non_latin_repetitive_output() -> None:
     payload = {"choices": [{"message": {"content": "具有战士ันันันันันันันันันันันันันันันันันันันันันันันัน"}}]}
 
     assert _extract_content(payload) is None
+
+
+def test_vllm_system_prompt_limits_model_to_explanation_role() -> None:
+    prompt = SYSTEM_PROMPT.casefold()
+
+    assert "only to explain" in prompt
+    assert "do not change" in prompt
+    assert "latin-script french or english" in prompt
+    assert "do not provide a diagnosis" in prompt
+    assert "human clinical review remains required" in prompt
+    assert "urgence_maximale" in prompt
+    assert "immediate clinical review or escalation" in prompt
+
+
+def test_vllm_request_context_keeps_only_expected_fields() -> None:
+    response = assess_triage({"symptoms": ["douleur thoracique"]})
+    request = build_chat_request(
+        {
+            "symptoms": ["douleur thoracique"],
+            "questionnaire_state": {"duration": "10 min"},
+            "patient_name": "Alice",
+            "notes": "unrelated raw field",
+        },
+        response,
+    )
+
+    user_payload = request["messages"][1]["content"]
+
+    assert '"priority": "urgence_maximale"' in user_payload
+    assert '"symptoms": ["douleur thoracique"]' in user_payload
+    assert "questionnaire_state" in user_payload
+    assert "patient_name" not in user_payload
+    assert "unrelated raw field" not in user_payload
+    assert request["temperature"] == 0
+    assert request["max_tokens"] == 160
+
+
+def test_vllm_accepts_valid_french_and_english_explanations() -> None:
+    french = {
+        "choices": [
+            {
+                "message": {
+                    "content": (
+                        "Cette priorite impose une revue clinique immediate. "
+                        "Les elements declares restent incertains et doivent etre confirmes par un professionnel."
+                    )
+                }
+            }
+        ]
+    }
+    english = {
+        "choices": [
+            {
+                "message": {
+                    "content": (
+                        "This priority requires immediate clinical review. "
+                        "The declared symptoms remain uncertain and must be confirmed by a clinician."
+                    )
+                }
+            }
+        ]
+    }
+
+    assert _extract_content(french) is not None
+    assert _extract_content(english) is not None
+
+
+def test_vllm_rejects_diagnostic_or_treatment_advice() -> None:
+    diagnostic = {
+        "choices": [{"message": {"content": "The diagnosis is asthma. Take 500 mg now."}}]
+    }
+
+    assert _extract_content(diagnostic) is None
