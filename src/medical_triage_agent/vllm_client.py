@@ -12,6 +12,27 @@ from urllib.request import Request, urlopen
 from medical_triage_agent.privacy import redact_pii
 from medical_triage_agent.triage import TRIAGE_ORDER, TriageResponse
 
+OUTPUT_CONTRACT = """Return exactly one JSON object and nothing else.
+
+Schema:
+{
+  "suggested_priority": "urgence_maximale" | "moderee" | "differee",
+  "explanation": "...",
+  "confidence": 0.0-1.0
+}
+
+Explanation rules:
+- Use the same language as the symptoms.
+- Write exactly:
+  - 3 sentences for urgence_maximale
+  - 2 sentences for moderee
+  - 2 sentences for differee
+- Do not repeat any sentence.
+- Do not introduce symptoms, diagnoses, diseases, treatments, hospitalization, or complications that were not provided.
+- Explain why the declared symptoms support the suggested priority.
+- Mention clinical review/human confirmation.
+- No markdown, no headings, no text outside JSON."""
+
 SYSTEM_PROMPT = (
     "You are a CHSA medical triage proof-of-concept assistant for clinical staff. "
     "Interpret the declared symptoms and suggest one triage priority. "
@@ -21,16 +42,10 @@ SYSTEM_PROMPT = (
     "Do not provide a diagnosis, medication, dosage, or home-treatment instructions. "
     "Mention uncertainty and that human clinical review remains required. "
     "Use only these priority labels: urgence_maximale, moderee, differee. "
-    "Return strict JSON only with keys suggested_priority, explanation, and confidence. "
-    "confidence must be a number between 0 and 1. "
-    "The first character of your answer must be { and the last character must be }. "
-    'Example: {"suggested_priority":"moderee","explanation":"The declared symptoms require '
-    'clinical review because uncertainty remains. A clinician must confirm the priority.",'
-    '"confidence":0.5}. '
     "Do not output headings such as taxpipeline, Reponse, Réponse, Priority, Explanation, "
     "or Explication. Do not write markdown or prose outside JSON. "
     "Do not mention v1 rules or copy fallback phrases such as Aucun symptome d'alerte. "
-    "The explanation must be 2 to 4 short sentences. Do not use markdown or bullets."
+    + OUTPUT_CONTRACT
 )
 
 _OPTIONAL_CONTEXT_KEYS = (
@@ -124,7 +139,7 @@ def build_chat_request(payload: dict[str, Any], response: TriageResponse) -> dic
             },
         ],
         "temperature": 0,
-        "max_tokens": 160,
+        "max_tokens": 110,
         "stop": ["具有战士", "具有战士user", "具有战士assistant", "\nuser", "\nassistant"],
     }
 
@@ -185,34 +200,13 @@ def extract_triage_generation(payload: dict[str, Any]) -> TriageGenerationResult
     suggested_priority = data.get("suggested_priority")
     explanation = data.get("explanation")
     confidence = data.get("confidence")
-    if suggested_priority not in TRIAGE_ORDER or not isinstance(explanation, str):
-        return TriageGenerationResult(
-            explanation=None,
-            llm_status="invalid_output",
-            llm_response_preview=preview,
-            llm_response_truncated=truncated,
-        )
-    if not _valid_explanation(explanation):
-        return TriageGenerationResult(
-            explanation=None,
-            llm_status="invalid_output",
-            llm_response_preview=preview,
-            llm_response_truncated=truncated,
-        )
-    if not isinstance(confidence, int | float) or not 0 <= float(confidence) <= 1:
-        return TriageGenerationResult(
-            explanation=None,
-            llm_status="invalid_output",
-            llm_response_preview=preview,
-            llm_response_truncated=truncated,
-        )
-    return TriageGenerationResult(
-        explanation=explanation.strip(),
-        llm_status="accepted",
-        suggested_priority=str(suggested_priority),
-        confidence=float(confidence),
-        llm_response_preview=preview,
-        llm_response_truncated=truncated,
+    return _accepted_or_invalid_result(
+        suggested_priority=suggested_priority,
+        explanation=explanation,
+        confidence=confidence,
+        preview=preview,
+        truncated=truncated,
+        repaired=False,
     )
 
 
@@ -240,20 +234,13 @@ def _repair_non_json_generation(
 
     suggested_priority = priority_match.group(1)
     explanation = explanation_match.group(1).strip()
-    if suggested_priority not in TRIAGE_ORDER or not _valid_explanation(explanation):
-        return TriageGenerationResult(
-            explanation=None,
-            llm_status="invalid_output",
-            llm_response_preview=preview,
-            llm_response_truncated=truncated,
-        )
-    return TriageGenerationResult(
-        explanation=explanation,
-        llm_status="accepted_repaired",
+    return _accepted_or_invalid_result(
         suggested_priority=suggested_priority,
+        explanation=explanation,
         confidence=0.5,
-        llm_response_preview=preview,
-        llm_response_truncated=truncated,
+        preview=preview,
+        truncated=truncated,
+        repaired=True,
     )
 
 
@@ -369,6 +356,7 @@ def _accepted_or_invalid_result(
             llm_response_preview=preview,
             llm_response_truncated=truncated,
         )
+    explanation, deduplicated = _deduplicate_repeated_sentences(explanation)
     if not _valid_explanation(explanation):
         return TriageGenerationResult(
             explanation=None,
@@ -385,7 +373,7 @@ def _accepted_or_invalid_result(
         )
     return TriageGenerationResult(
         explanation=explanation.strip(),
-        llm_status="accepted_repaired" if repaired else "accepted",
+        llm_status="accepted_repaired" if repaired or deduplicated else "accepted",
         suggested_priority=str(suggested_priority),
         confidence=float(confidence),
         llm_response_preview=preview,
@@ -434,6 +422,8 @@ def _safe_preview(content: str, limit: int = 1200) -> tuple[str, bool]:
 def _valid_explanation(explanation: str) -> bool:
     if not 20 <= len(explanation) <= 800:
         return False
+    if len(_sentences(explanation)) < 2:
+        return False
     if re.search(r"(.)\1{7,}", explanation):
         return False
     if _has_repeated_sentence(explanation):
@@ -447,14 +437,49 @@ def _valid_explanation(explanation: str) -> bool:
 
 def _has_repeated_sentence(explanation: str) -> bool:
     seen: set[str] = set()
-    for sentence in re.split(r"[.!?]+", explanation):
-        normalized = re.sub(r"\s+", " ", sentence.strip().casefold())
-        if len(normalized) < 12:
+    for sentence in _sentences(explanation):
+        normalized = _normalized_sentence(sentence)
+        if not normalized:
             continue
         if normalized in seen:
             return True
         seen.add(normalized)
     return False
+
+
+def _deduplicate_repeated_sentences(explanation: str) -> tuple[str, bool]:
+    sentences = _sentences(explanation)
+    if not sentences:
+        return explanation, False
+    kept: list[str] = []
+    seen: set[str] = set()
+    deduplicated = False
+    for sentence in sentences:
+        normalized = _normalized_sentence(sentence)
+        if not normalized:
+            kept.append(sentence)
+            continue
+        if normalized in seen:
+            deduplicated = True
+            continue
+        seen.add(normalized)
+        kept.append(sentence)
+    if not deduplicated:
+        return explanation, False
+    return " ".join(kept), True
+
+
+def _sentences(explanation: str) -> list[str]:
+    return [
+        match.group(0).strip()
+        for match in re.finditer(r"[^.!?]+[.!?]+|[^.!?]+$", explanation)
+        if match.group(0).strip()
+    ]
+
+
+def _normalized_sentence(sentence: str) -> str:
+    stripped = re.sub(r"\s+", " ", sentence.strip().casefold())
+    return stripped if len(stripped) >= 12 else ""
 
 
 def _contains_forbidden_advice(explanation: str) -> bool:
@@ -472,6 +497,14 @@ def _contains_forbidden_advice(explanation: str) -> bool:
         "médicament",
         "medicament",
         "antihypertenseur",
+        "hospitalization",
+        "hospitalisation",
+        "no hospitalization",
+        "pas d'hospitalisation",
+        "simple care",
+        "does not require urgent treatment",
+        "ne nécessite pas de traitement urgent",
+        "ne necessite pas de traitement urgent",
     )
     return any(fragment in lowered for fragment in forbidden_fragments) or bool(
         re.search(r"\b\d+\s*(mg|ml)\b", lowered)

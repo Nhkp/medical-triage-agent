@@ -268,10 +268,16 @@ def test_vllm_system_prompt_limits_model_to_explanation_role() -> None:
     assert "human clinical review remains required" in prompt
     assert "suggested_priority" in prompt
     assert "confidence" in prompt
-    assert "first character" in prompt
+    assert "return exactly one json object and nothing else" in prompt
+    assert '"suggested_priority": "urgence_maximale" | "moderee" | "differee"' in prompt
+    assert "3 sentences for urgence_maximale" in prompt
+    assert "2 sentences for moderee" in prompt
+    assert "do not repeat any sentence" in prompt
+    assert "do not introduce symptoms, diagnoses, diseases, treatments, hospitalization" in prompt
+    assert "explain why the declared symptoms support the suggested priority" in prompt
     assert "taxpipeline" in prompt
     assert "aucun symptome d'alerte" in prompt
-    assert "prose outside json" in prompt
+    assert "no markdown, no headings, no text outside json" in prompt
 
 
 def test_vllm_request_context_keeps_only_expected_fields() -> None:
@@ -296,7 +302,7 @@ def test_vllm_request_context_keeps_only_expected_fields() -> None:
     assert "patient_name" not in user_payload
     assert "unrelated raw field" not in user_payload
     assert request["temperature"] == 0
-    assert request["max_tokens"] == 160
+    assert request["max_tokens"] == 110
     assert "具有战士" in request["stop"]
     assert "具有战士user" in request["stop"]
     assert "\nassistant" in request["stop"]
@@ -534,7 +540,7 @@ def test_vllm_bad_response_for_object_without_usable_explanation() -> None:
     assert extract_explanation(payload).llm_status == "bad_response"
 
 
-def test_vllm_rejects_repaired_repeated_explanation() -> None:
+def test_vllm_repairs_repeated_explanation_by_deduplicating_sentences() -> None:
     payload = {
         "choices": [
             {
@@ -550,7 +556,73 @@ def test_vllm_rejects_repaired_repeated_explanation() -> None:
         ]
     }
 
+    result = extract_explanation(payload)
+
+    assert result.llm_status == "accepted_repaired"
+    assert result.suggested_priority == "urgence_maximale"
+    assert result.explanation == (
+        "La revue clinique est obligatoire. La douleur thoracique doit etre revue sans delai."
+    )
+
+
+def test_vllm_rejects_repeated_explanation_when_deduplication_is_too_short() -> None:
+    payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": (
+                        "Reponse: moderee\n\n"
+                        "Explanation: Revue clinique requise. Revue clinique requise."
+                    )
+                }
+            }
+        ]
+    }
+
     assert extract_explanation(payload).llm_status == "invalid_output"
+
+
+def test_vllm_rejects_contradictory_urgent_explanation() -> None:
+    payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": (
+                        "Reponse: urgence_maximale\n\n"
+                        "Explanation: The declared symptoms do not require urgent treatment. "
+                        "Simple care is enough before a clinician confirms the context."
+                    )
+                }
+            }
+        ]
+    }
+
+    assert extract_explanation(payload).llm_status == "invalid_output"
+
+
+def test_api_can_use_matching_moderee_repaired_explanation(monkeypatch: MonkeyPatch) -> None:
+    content = (
+        "Reponse: moderee\n\n"
+        "Explication: Les symptômes déclarés ne montrent pas ici de signal immédiat critique. "
+        "Une revue clinique reste nécessaire pour confirmer le contexte."
+    )
+    payload = {"choices": [{"message": {"content": content}}]}
+
+    def fake_urlopen(_request: Any, timeout: float | None) -> _Response:
+        return _Response(json.dumps(payload).encode("utf-8"))
+
+    monkeypatch.setenv("VLLM_BASE_URL", "http://vllm.test/v1")
+    monkeypatch.setattr("medical_triage_agent.vllm_client.urlopen", fake_urlopen)
+
+    response = api.triage({"symptoms": ["céphalées", "nez qui coule"]})
+
+    assert response["priority"] == "moderee"
+    assert response["rule_priority"] == "moderee"
+    assert response["llm_priority"] == "moderee"
+    assert response["priority_source"] == "shared"
+    assert response["arbitration"] == "matched"
+    assert response["explanation_source"] == "llm"
+    assert response["llm_status"] == "accepted_repaired"
 
 
 def test_vllm_rejects_repaired_unsafe_advice() -> None:
