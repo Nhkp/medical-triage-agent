@@ -19,6 +19,8 @@ def triage(payload: dict[str, Any]) -> dict[str, str]:
         rule_priority=rule_response.priority,
         llm_priority=generation_result.suggested_priority,
         llm_confidence=generation_result.confidence,
+        llm_response_preview=generation_result.llm_response_preview,
+        llm_response_truncated=generation_result.llm_response_truncated,
         priority_source=priority_source,
         arbitration=arbitration,
         explanation=generation_result.explanation or rule_response.explanation,

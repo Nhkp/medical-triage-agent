@@ -9,6 +9,7 @@ from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
+from medical_triage_agent.privacy import redact_pii
 from medical_triage_agent.triage import TRIAGE_ORDER, TriageResponse
 
 SYSTEM_PROMPT = (
@@ -44,6 +45,8 @@ class TriageGenerationResult:
     llm_status: str
     suggested_priority: str | None = None
     confidence: float | None = None
+    llm_response_preview: str | None = None
+    llm_response_truncated: bool = False
 
     @property
     def explanation_source(self) -> str:
@@ -76,13 +79,20 @@ def generate_triage(payload: dict[str, Any], response: TriageResponse) -> Triage
     )
     try:
         with urlopen(request, timeout=_request_timeout()) as raw:
-            response_payload = json.loads(raw.read().decode("utf-8"))
+            response_text = raw.read().decode("utf-8")
+            response_payload = json.loads(response_text)
     except TimeoutError:
         return TriageGenerationResult(explanation=None, llm_status="timeout")
     except (OSError, URLError):
         return TriageGenerationResult(explanation=None, llm_status="connection_error")
     except json.JSONDecodeError:
-        return TriageGenerationResult(explanation=None, llm_status="bad_response")
+        preview, truncated = _safe_preview(response_text)
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="bad_response",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
 
     return extract_triage_generation(response_payload)
 
@@ -145,28 +155,62 @@ def extract_explanation(payload: dict[str, Any]) -> ExplanationResult:
 def extract_triage_generation(payload: dict[str, Any]) -> TriageGenerationResult:
     content = _raw_content(payload)
     if content is None:
-        return TriageGenerationResult(explanation=None, llm_status="bad_response")
+        preview, truncated = _safe_preview(json.dumps(payload, ensure_ascii=False, sort_keys=True))
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="bad_response",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
+    preview, truncated = _safe_preview(content)
     try:
         data = json.loads(_strip_code_fence(content))
     except json.JSONDecodeError:
-        return TriageGenerationResult(explanation=None, llm_status="bad_response")
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="bad_response",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
     if not isinstance(data, dict):
-        return TriageGenerationResult(explanation=None, llm_status="bad_response")
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="bad_response",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
 
     suggested_priority = data.get("suggested_priority")
     explanation = data.get("explanation")
     confidence = data.get("confidence")
     if suggested_priority not in TRIAGE_ORDER or not isinstance(explanation, str):
-        return TriageGenerationResult(explanation=None, llm_status="invalid_output")
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="invalid_output",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
     if not _valid_explanation(explanation):
-        return TriageGenerationResult(explanation=None, llm_status="invalid_output")
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="invalid_output",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
     if not isinstance(confidence, int | float) or not 0 <= float(confidence) <= 1:
-        return TriageGenerationResult(explanation=None, llm_status="invalid_output")
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="invalid_output",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
     return TriageGenerationResult(
         explanation=explanation.strip(),
         llm_status="accepted",
         suggested_priority=str(suggested_priority),
         confidence=float(confidence),
+        llm_response_preview=preview,
+        llm_response_truncated=truncated,
     )
 
 
@@ -199,6 +243,13 @@ def _strip_code_fence(content: str) -> str:
     if len(lines) >= 3 and lines[-1].strip() == "```":
         return "\n".join(lines[1:-1]).strip()
     return stripped
+
+
+def _safe_preview(content: str, limit: int = 1200) -> tuple[str, bool]:
+    redacted = redact_pii(content).strip()
+    if len(redacted) <= limit:
+        return redacted, False
+    return redacted[:limit].rstrip(), True
 
 
 def _valid_explanation(explanation: str) -> bool:

@@ -53,6 +53,8 @@ class TriageResponse:
     rule_priority: str | None = None
     llm_priority: str | None = None
     llm_confidence: float | None = None
+    llm_response_preview: str | None = None
+    llm_response_truncated: bool = False
     priority_source: str = "rule"
     arbitration: str = "rule_only"
 
@@ -116,6 +118,12 @@ def audit_metadata(
         "rule_priority": response.rule_priority or response.priority,
         "llm_priority": response.llm_priority,
         "llm_confidence": response.llm_confidence,
+        "llm_response_preview": (
+            redact_pii(response.llm_response_preview)
+            if response.llm_response_preview is not None
+            else None
+        ),
+        "llm_response_truncated": response.llm_response_truncated,
         "priority_source": response.priority_source,
         "arbitration": response.arbitration,
         "model": model,

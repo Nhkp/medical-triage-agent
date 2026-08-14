@@ -59,6 +59,8 @@ def test_api_audit_returns_metadata_without_raw_patient_text() -> None:
     assert audit_record["model"] == "rule_based_v1"
     assert audit_record["explanation_source"] == "fallback"
     assert audit_record["llm_status"] == "not_configured"
+    assert audit_record["llm_response_preview"] is None
+    assert audit_record["llm_response_truncated"] is False
     assert "created_at" in audit_record
     assert "patient@example.test" not in str(audit_record)
 
@@ -107,7 +109,11 @@ def test_valid_vllm_explanation_is_used(monkeypatch: MonkeyPatch) -> None:
         api,
         "generate_triage",
         lambda _payload, _response: ExplanationResult(
-            explanation, "accepted", "urgence_maximale", 0.8
+            explanation,
+            "accepted",
+            "urgence_maximale",
+            0.8,
+            '{"suggested_priority":"urgence_maximale","explanation":"ok","confidence":0.8}',
         ),
     )
 
@@ -122,6 +128,10 @@ def test_valid_vllm_explanation_is_used(monkeypatch: MonkeyPatch) -> None:
     assert response["arbitration"] == "matched"
     assert response["explanation_source"] == "llm"
     assert response["llm_status"] == "accepted"
+    audit_record = api.audit(response["audit_id"])
+    assert audit_record is not None
+    assert audit_record["llm_response_preview"] is not None
+    assert "suggested_priority" in audit_record["llm_response_preview"]
 
 
 def test_llm_can_escalate_non_red_flag_priority(monkeypatch: MonkeyPatch) -> None:
@@ -372,6 +382,27 @@ def test_generate_explanation_returns_llm_status_for_valid_response(
     assert result.llm_status == "accepted"
     assert result.suggested_priority == "urgence_maximale"
     assert result.confidence == 0.9
+    assert result.llm_response_preview is not None
+    assert "suggested_priority" in result.llm_response_preview
+    assert result.llm_response_truncated is False
+
+
+def test_bad_llm_response_preview_is_available_and_redacted(monkeypatch: MonkeyPatch) -> None:
+    payload = {"choices": [{"message": {"content": "patient@example.test not json"}}]}
+
+    def fake_urlopen(_request: Any, timeout: float | None) -> _Response:
+        return _Response(json.dumps(payload).encode("utf-8"))
+
+    monkeypatch.setenv("VLLM_BASE_URL", "http://vllm.test/v1")
+    monkeypatch.setattr("medical_triage_agent.vllm_client.urlopen", fake_urlopen)
+
+    response = api.triage({"symptoms": ["fatigue"]})
+    audit_record = api.audit(response["audit_id"])
+
+    assert response["llm_status"] == "bad_response"
+    assert audit_record is not None
+    assert audit_record["llm_response_preview"] == "[REDACTED_EMAIL] not json"
+    assert "patient@example.test" not in str(audit_record)
 
 
 def test_generate_explanation_reports_timeout(monkeypatch: MonkeyPatch) -> None:
