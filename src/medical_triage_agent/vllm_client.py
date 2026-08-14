@@ -5,8 +5,8 @@ import os
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Any
-from urllib.error import URLError
+from typing import Any, Literal
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from medical_triage_agent.privacy import redact_pii
@@ -32,6 +32,20 @@ Explanation rules:
 - Explain why the declared symptoms support the suggested priority.
 - Mention clinical review/human confirmation.
 - No markdown, no headings, no text outside JSON."""
+
+TRIAGE_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "suggested_priority": {
+            "type": "string",
+            "enum": ["urgence_maximale", "moderee", "differee"],
+        },
+        "explanation": {"type": "string"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    },
+    "required": ["suggested_priority", "explanation", "confidence"],
+    "additionalProperties": False,
+}
 
 SYSTEM_PROMPT = (
     "You are a CHSA medical triage proof-of-concept assistant for clinical staff. "
@@ -92,17 +106,15 @@ def generate_triage(payload: dict[str, Any], response: TriageResponse) -> Triage
         return TriageGenerationResult(explanation=None, llm_status="not_configured")
 
     request_payload = build_chat_request(payload, response)
-    data = json.dumps(request_payload).encode("utf-8")
-    request = Request(
-        f"{base_url.rstrip('/')}/chat/completions",
-        data=data,
-        headers=_headers(),
-        method="POST",
-    )
+    request = _chat_request(base_url, request_payload)
     try:
         with urlopen(request, timeout=_request_timeout()) as raw:
             response_text = raw.read().decode("utf-8")
             response_payload = json.loads(response_text)
+    except HTTPError as exc:
+        if not _should_retry_with_legacy_guided_json(exc):
+            return TriageGenerationResult(explanation=None, llm_status="connection_error")
+        return _generate_triage_with_legacy_guided_json(base_url, payload, response)
     except TimeoutError:
         return TriageGenerationResult(explanation=None, llm_status="timeout")
     except (OSError, URLError):
@@ -123,8 +135,13 @@ def generate_explanation(payload: dict[str, Any], response: TriageResponse) -> E
     return generate_triage(payload, response)
 
 
-def build_chat_request(payload: dict[str, Any], response: TriageResponse) -> dict[str, Any]:
-    return {
+def build_chat_request(
+    payload: dict[str, Any],
+    response: TriageResponse,
+    *,
+    structured_output: Literal["structured_outputs", "guided_json"] = "structured_outputs",
+) -> dict[str, Any]:
+    request: dict[str, Any] = {
         "model": configured_model(),
         "messages": [
             {
@@ -142,6 +159,48 @@ def build_chat_request(payload: dict[str, Any], response: TriageResponse) -> dic
         "max_tokens": 110,
         "stop": ["具有战士", "具有战士user", "具有战士assistant", "\nuser", "\nassistant"],
     }
+    if structured_output == "guided_json":
+        request["guided_json"] = TRIAGE_JSON_SCHEMA
+    else:
+        request["structured_outputs"] = {"json": TRIAGE_JSON_SCHEMA}
+    return request
+
+
+def _chat_request(base_url: str, payload: dict[str, Any]) -> Request:
+    data = json.dumps(payload).encode("utf-8")
+    return Request(
+        f"{base_url.rstrip('/')}/chat/completions",
+        data=data,
+        headers=_headers(),
+        method="POST",
+    )
+
+
+def _should_retry_with_legacy_guided_json(exc: HTTPError) -> bool:
+    return exc.code in {400, 404, 422}
+
+
+def _generate_triage_with_legacy_guided_json(
+    base_url: str, payload: dict[str, Any], response: TriageResponse
+) -> TriageGenerationResult:
+    request_payload = build_chat_request(payload, response, structured_output="guided_json")
+    try:
+        with urlopen(_chat_request(base_url, request_payload), timeout=_request_timeout()) as raw:
+            response_text = raw.read().decode("utf-8")
+            response_payload = json.loads(response_text)
+    except TimeoutError:
+        return TriageGenerationResult(explanation=None, llm_status="timeout")
+    except (OSError, URLError):
+        return TriageGenerationResult(explanation=None, llm_status="connection_error")
+    except json.JSONDecodeError:
+        preview, truncated = _safe_preview(response_text)
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="bad_response",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
+    return extract_triage_generation(response_payload)
 
 
 def _model_context(payload: dict[str, Any], response: TriageResponse) -> dict[str, Any]:

@@ -153,6 +153,18 @@ Deterministic model-evaluation entrypoint:
 make eval-models
 ```
 
+Model calibration comparison:
+
+- `notebooks/kaggle_model_comparison.ipynb` compares base, SFT, and DPO serving behavior on a
+  curated bilingual triage-calibration fixture.
+- vLLM structured JSON output is requested before parser repair, so malformed schemas such as
+  `{lng: ...}` are treated as model failures rather than normal output.
+- The comparison reports format acceptance, benign over-escalation, red-flag recall,
+  priority mismatch, repeated output, and latency under `outputs/evaluations/`.
+- If DPO over-escalates benign symptoms more than SFT while preserving no clear safety gain,
+  the demo should prefer SFT and keep DPO experimental until retrained with triage-specific
+  preference pairs.
+
 ## Deployment
 
 Current API supports LLM-assisted triage suggestions through a vLLM-compatible chat endpoint via

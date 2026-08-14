@@ -9,7 +9,7 @@ PRESENTATION_OUT ?= dist/presentations/chsa-current-state.pptx
 
 API_URL ?=
 
-.PHONY: sync sync-training sync-ui sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean train-sft-smoke train-dpo-smoke train-grpo-smoke eval-models serve-local serve-api serve-ui serve-colab-dry-run serve-kaggle-dry-run eval-latency eval-robustness step3-ready presentation-browser presentation-html presentation-pptx presentation-ready clean
+.PHONY: sync sync-training sync-ui sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean train-sft-smoke train-dpo-smoke train-grpo-smoke eval-models eval-model-comparison-dry-run eval-model-comparison serve-local serve-api serve-ui serve-colab-dry-run serve-kaggle-dry-run eval-latency eval-robustness step3-ready presentation-browser presentation-html presentation-pptx presentation-ready clean
 
 sync:
 	uv sync
@@ -73,6 +73,12 @@ train-grpo-smoke:
 
 eval-models:
 	uv run scripts/evaluate.py --config configs/sft.yaml --model base --dry-run
+
+eval-model-comparison-dry-run:
+	uv run python scripts/evaluate_model_comparison.py --dry-run
+
+eval-model-comparison:
+	uv run python scripts/evaluate_model_comparison.py $(if $(API_URL),--url $(API_URL),)
 
 serve-local:
 	docker compose --profile gpu up --build

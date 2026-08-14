@@ -303,9 +303,31 @@ def test_vllm_request_context_keeps_only_expected_fields() -> None:
     assert "unrelated raw field" not in user_payload
     assert request["temperature"] == 0
     assert request["max_tokens"] == 110
+    assert request["structured_outputs"]["json"]["required"] == [
+        "suggested_priority",
+        "explanation",
+        "confidence",
+    ]
+    assert request["structured_outputs"]["json"]["additionalProperties"] is False
     assert "具有战士" in request["stop"]
     assert "具有战士user" in request["stop"]
     assert "\nassistant" in request["stop"]
+
+
+def test_vllm_request_can_use_legacy_guided_json_payload() -> None:
+    response = assess_triage({"symptoms": ["douleur thoracique"]})
+    request = build_chat_request(
+        {"symptoms": ["douleur thoracique"]},
+        response,
+        structured_output="guided_json",
+    )
+
+    assert "structured_outputs" not in request
+    assert request["guided_json"]["properties"]["suggested_priority"]["enum"] == [
+        "urgence_maximale",
+        "moderee",
+        "differee",
+    ]
 
 
 def test_vllm_accepts_valid_french_and_english_explanations() -> None:

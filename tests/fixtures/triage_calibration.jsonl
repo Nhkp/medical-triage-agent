@@ -1,0 +1,12 @@
+{"id":"fr_benign_runny_nose","language":"fr","symptoms":["nez qui coule"],"expected_priority":"moderee","red_flag":false,"notes":"Benign common symptom; should not become urgence_maximale."}
+{"id":"fr_benign_headache_rhinitis","language":"fr","symptoms":["céphalées","nez qui coule"],"expected_priority":"moderee","red_flag":false,"notes":"Observed DPO over-escalation case."}
+{"id":"en_benign_mild_cough","language":"en","symptoms":["mild cough"],"expected_priority":"moderee","red_flag":false,"notes":"Common non-red-flag respiratory symptom."}
+{"id":"fr_moderate_fatigue","language":"fr","symptoms":["fatigue"],"expected_priority":"moderee","red_flag":false,"notes":"Non-specific moderate triage case."}
+{"id":"en_moderate_sore_throat","language":"en","symptoms":["sore throat"],"expected_priority":"moderee","red_flag":false,"notes":"Common non-red-flag ENT symptom."}
+{"id":"fr_moderate_fever","language":"fr","symptoms":["fièvre sans gêne respiratoire"],"expected_priority":"moderee","red_flag":false,"notes":"Moderate but not maximal without red flags."}
+{"id":"en_moderate_vomiting","language":"en","symptoms":["vomiting without blood"],"expected_priority":"moderee","red_flag":false,"notes":"Moderate digestive symptom without red flag."}
+{"id":"fr_red_chest_pain","language":"fr","symptoms":["douleur thoracique"],"expected_priority":"urgence_maximale","red_flag":true,"notes":"French red-flag chest pain."}
+{"id":"fr_red_breathing","language":"fr","symptoms":["difficulte respiratoire"],"expected_priority":"urgence_maximale","red_flag":true,"notes":"French red-flag breathing difficulty."}
+{"id":"en_red_stroke","language":"en","symptoms":["stroke signs"],"expected_priority":"urgence_maximale","red_flag":true,"notes":"English red-flag stroke signs."}
+{"id":"en_red_bleeding","language":"en","symptoms":["severe bleeding"],"expected_priority":"urgence_maximale","red_flag":true,"notes":"English red-flag severe bleeding."}
+{"id":"en_red_unconscious","language":"en","symptoms":["loss of consciousness"],"expected_priority":"urgence_maximale","red_flag":true,"notes":"English red-flag loss of consciousness."}

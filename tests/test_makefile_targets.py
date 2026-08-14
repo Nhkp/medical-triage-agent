@@ -19,6 +19,8 @@ def test_makefile_exposes_data_preparation_targets() -> None:
         "train-dpo-smoke:",
         "train-grpo-smoke:",
         "eval-models:",
+        "eval-model-comparison-dry-run:",
+        "eval-model-comparison:",
         "serve-local:",
         "serve-api:",
         "serve-ui:",
@@ -37,6 +39,7 @@ def test_makefile_exposes_data_preparation_targets() -> None:
     assert "scripts/train_dpo.py" in makefile
     assert "scripts/train_grpo.py" in makefile
     assert "scripts/evaluate.py" in makefile
+    assert "scripts/evaluate_model_comparison.py" in makefile
     assert "scripts/evaluate_latency.py" in makefile
     assert "scripts/evaluate_robustness.py" in makefile
     assert "scripts/serve_colab.py" in makefile
