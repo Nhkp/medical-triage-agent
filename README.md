@@ -118,6 +118,18 @@ Launch the FastAPI wrapper only:
 make serve-api
 ```
 
+Open the built-in FastAPI demo console:
+
+```text
+http://127.0.0.1:8080/demo
+```
+
+For a Kaggle/ngrok serving session, open:
+
+```text
+https://your-ngrok-url.ngrok-free.dev/demo
+```
+
 Launch the Docker Compose vLLM + FastAPI demo on a GPU host:
 
 ```bash
