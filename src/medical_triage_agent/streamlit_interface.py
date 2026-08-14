@@ -31,7 +31,7 @@ def request_json(
     base_url: str,
     path: str,
     payload: dict[str, Any] | None = None,
-    timeout: float = 15.0,
+    timeout: float | None = None,
 ) -> ApiResult:
     body = json.dumps(payload).encode("utf-8") if payload is not None else None
     request = Request(
@@ -70,7 +70,9 @@ def run_app() -> None:
     st.caption("Optional Streamlit console for the FastAPI/vLLM proof of concept.")
 
     api_url = st.sidebar.text_input("API base URL", value=DEFAULT_API_URL)
-    st.sidebar.caption("Use localhost for local FastAPI, or your Kaggle/ngrok URL.")
+    st.sidebar.caption(
+        "Use localhost for local FastAPI, or your Kaggle/ngrok URL. No client timeout is applied."
+    )
 
     if st.sidebar.button("Check API health"):
         _render_health(request_json("GET", api_url, "/health"))

@@ -33,8 +33,8 @@ def test_endpoint_url_handles_trailing_slashes() -> None:
 
 
 def test_request_json_returns_decoded_payload(monkeypatch: Any) -> None:
-    def fake_urlopen(_request: Any, timeout: float) -> _Response:
-        assert timeout == 15.0
+    def fake_urlopen(_request: Any, timeout: float | None) -> _Response:
+        assert timeout is None
         return _Response(b'{"status": "ok"}')
 
     monkeypatch.setattr(ui, "urlopen", fake_urlopen)
@@ -43,7 +43,7 @@ def test_request_json_returns_decoded_payload(monkeypatch: Any) -> None:
 
 
 def test_request_json_reports_http_error(monkeypatch: Any) -> None:
-    def fake_urlopen(_request: Any, timeout: float) -> _Response:
+    def fake_urlopen(_request: Any, timeout: float | None) -> _Response:
         raise HTTPError(
             "http://api.test/triage",
             400,
@@ -62,7 +62,7 @@ def test_request_json_reports_http_error(monkeypatch: Any) -> None:
 
 
 def test_request_json_reports_connection_error(monkeypatch: Any) -> None:
-    def fake_urlopen(_request: Any, timeout: float) -> _Response:
+    def fake_urlopen(_request: Any, timeout: float | None) -> _Response:
         raise URLError("offline")
 
     monkeypatch.setattr(ui, "urlopen", fake_urlopen)
