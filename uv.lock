@@ -882,6 +882,7 @@ name = "medical-triage-agent"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "fastapi" },
     { name = "mypy" },
     { name = "pre-commit" },
     { name = "pytest" },
@@ -895,7 +896,6 @@ presentation = [
     { name = "python-pptx" },
 ]
 serving = [
-    { name = "fastapi" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 training = [
@@ -917,7 +917,7 @@ requires-dist = [
     { name = "accelerate", marker = "extra == 'training'", specifier = ">=1.0.0" },
     { name = "bitsandbytes", marker = "sys_platform == 'linux' and extra == 'training'", specifier = ">=0.43.0" },
     { name = "datasets", marker = "extra == 'training'", specifier = ">=4.0.0" },
-    { name = "fastapi", marker = "extra == 'serving'", specifier = ">=0.116.0" },
+    { name = "fastapi", specifier = ">=0.116.0" },
     { name = "mypy", specifier = ">=2.3.0" },
     { name = "peft", marker = "extra == 'training'", specifier = ">=0.17.0" },
     { name = "playwright", marker = "extra == 'presentation'", specifier = ">=1.54.0" },

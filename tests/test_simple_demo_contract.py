@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import importlib.util
 import tomllib
 from pathlib import Path
-
-import pytest
 
 from medical_triage_agent.api import create_app
 
@@ -40,12 +37,9 @@ def test_readme_documents_streamlit_tester_without_demo_endpoint() -> None:
     assert "/demo" not in readme
 
 
-@pytest.mark.skipif(importlib.util.find_spec("fastapi") is None, reason="FastAPI extra missing")
 def test_demo_routes_are_not_part_of_fastapi_contract() -> None:
-    from fastapi.testclient import TestClient
+    paths = {route.path for route in create_app().routes}
 
-    client = TestClient(create_app())
-
-    for path in ("/", "/demo"):
-        response = client.get(path)
-        assert response.status_code == 404
+    assert "/" not in paths
+    assert "/demo" not in paths
+    assert {"/health", "/triage", "/audit/{audit_id}"}.issubset(paths)

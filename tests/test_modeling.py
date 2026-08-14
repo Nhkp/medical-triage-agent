@@ -71,6 +71,7 @@ def test_trainable_parameter_cast_skips_frozen_parameter(monkeypatch: pytest.Mon
         return Torch()
 
     model = Model()
+    monkeypatch.setattr(importlib.util, "find_spec", lambda _name: object())
     monkeypatch.setattr("medical_triage_agent.modeling.import_module", fake_import_module)
 
     cast_trainable_parameters_to_fp32(model)
