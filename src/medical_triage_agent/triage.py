@@ -46,6 +46,8 @@ class TriageResponse:
     explanation: str
     disclaimer: str
     audit_id: str
+    explanation_source: str = "fallback"
+    llm_status: str = "not_configured"
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -53,6 +55,8 @@ class TriageResponse:
             "explanation": self.explanation,
             "disclaimer": self.disclaimer,
             "audit_id": self.audit_id,
+            "explanation_source": self.explanation_source,
+            "llm_status": self.llm_status,
         }
 
 
@@ -98,6 +102,8 @@ def audit_metadata(
         "audit_id": response.audit_id,
         "priority": response.priority,
         "model": model,
+        "explanation_source": response.explanation_source,
+        "llm_status": response.llm_status,
         "created_at": datetime.now(UTC).isoformat(),
         # Store a hash for traceability without exposing raw patient text through audit APIs.
         "payload_hash": _hash(redacted_payload),

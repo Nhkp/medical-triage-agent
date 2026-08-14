@@ -116,6 +116,12 @@ def _render_triage(result: ApiResult) -> None:
         st.error(f"Urgent escalation: {priority}")
     else:
         st.info(f"Priority: {priority}")
+    source = result.data.get("explanation_source", "unknown")
+    llm_status = result.data.get("llm_status", "unknown")
+    if source == "llm":
+        st.success(f"Explanation source: {source} ({llm_status})")
+    else:
+        st.warning(f"Explanation source: {source} (LLM status: {llm_status})")
     st.write(result.data.get("explanation", ""))
     st.caption(result.data.get("disclaimer", ""))
 

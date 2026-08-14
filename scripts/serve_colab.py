@@ -98,7 +98,6 @@ def _env(args: argparse.Namespace, repo_root: Path) -> dict[str, str]:
         or env.get("VLLM_BASE_MODEL_ID")
         or env.get("VLLM_MODEL_ID", "Qwen/Qwen3-1.7B-Base")
     )
-    env.setdefault("VLLM_TIMEOUT_SECONDS", "30")
     return env
 
 

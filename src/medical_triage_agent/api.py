@@ -10,14 +10,15 @@ _AUDIT_STORE: dict[str, dict[str, Any]] = {}
 
 def triage(payload: dict[str, Any]) -> dict[str, str]:
     response = assess_triage(payload)
-    generated_explanation = generate_explanation(payload, response)
-    if generated_explanation is not None:
-        response = TriageResponse(
-            priority=response.priority,
-            explanation=generated_explanation,
-            disclaimer=response.disclaimer,
-            audit_id=response.audit_id,
-        )
+    explanation_result = generate_explanation(payload, response)
+    response = TriageResponse(
+        priority=response.priority,
+        explanation=explanation_result.explanation or response.explanation,
+        disclaimer=response.disclaimer,
+        audit_id=response.audit_id,
+        explanation_source=explanation_result.explanation_source,
+        llm_status=explanation_result.llm_status,
+    )
     _AUDIT_STORE[response.audit_id] = audit_metadata(payload, response, model=configured_model())
     return response.to_dict()
 

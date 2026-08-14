@@ -4,6 +4,7 @@ import json
 import os
 import re
 import unicodedata
+from dataclasses import dataclass
 from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
@@ -35,6 +36,16 @@ _OPTIONAL_CONTEXT_KEYS = (
 )
 
 
+@dataclass(frozen=True)
+class ExplanationResult:
+    explanation: str | None
+    llm_status: str
+
+    @property
+    def explanation_source(self) -> str:
+        return "llm" if self.llm_status == "accepted" else "fallback"
+
+
 def configured_model() -> str:
     return os.environ.get("VLLM_MODEL_ID", "rule_based_v1")
 
@@ -43,10 +54,10 @@ def is_configured() -> bool:
     return bool(os.environ.get("VLLM_BASE_URL"))
 
 
-def generate_explanation(payload: dict[str, Any], response: TriageResponse) -> str | None:
+def generate_explanation(payload: dict[str, Any], response: TriageResponse) -> ExplanationResult:
     base_url = os.environ.get("VLLM_BASE_URL")
     if not base_url:
-        return None
+        return ExplanationResult(explanation=None, llm_status="not_configured")
 
     request_payload = build_chat_request(payload, response)
     data = json.dumps(request_payload).encode("utf-8")
@@ -57,12 +68,16 @@ def generate_explanation(payload: dict[str, Any], response: TriageResponse) -> s
         method="POST",
     )
     try:
-        with urlopen(request, timeout=float(os.environ.get("VLLM_TIMEOUT_SECONDS", "10"))) as raw:
+        with urlopen(request, timeout=_request_timeout()) as raw:
             response_payload = json.loads(raw.read().decode("utf-8"))
-    except (OSError, URLError, TimeoutError, json.JSONDecodeError):
-        return None
+    except TimeoutError:
+        return ExplanationResult(explanation=None, llm_status="timeout")
+    except (OSError, URLError):
+        return ExplanationResult(explanation=None, llm_status="connection_error")
+    except json.JSONDecodeError:
+        return ExplanationResult(explanation=None, llm_status="bad_response")
 
-    return _extract_content(response_payload)
+    return extract_explanation(response_payload)
 
 
 def build_chat_request(payload: dict[str, Any], response: TriageResponse) -> dict[str, Any]:
@@ -89,6 +104,7 @@ def _model_context(payload: dict[str, Any], response: TriageResponse) -> dict[st
     context: dict[str, Any] = {
         "symptoms": payload.get("symptoms", []),
         "priority": response.priority,
+        "draft_explanation": response.explanation,
     }
     for key in _OPTIONAL_CONTEXT_KEYS:
         if key in payload:
@@ -104,7 +120,29 @@ def _headers() -> dict[str, str]:
     return headers
 
 
+def _request_timeout() -> float | None:
+    configured = os.environ.get("VLLM_TIMEOUT_SECONDS")
+    if configured is None or configured.strip().casefold() in {"", "0", "none"}:
+        return None
+    return float(configured)
+
+
+def extract_explanation(payload: dict[str, Any]) -> ExplanationResult:
+    content = _raw_content(payload)
+    if content is None:
+        return ExplanationResult(explanation=None, llm_status="bad_response")
+    explanation = content.strip()
+    if not _valid_explanation(explanation):
+        return ExplanationResult(explanation=None, llm_status="invalid_output")
+    return ExplanationResult(explanation=explanation, llm_status="accepted")
+
+
 def _extract_content(payload: dict[str, Any]) -> str | None:
+    result = extract_explanation(payload)
+    return result.explanation
+
+
+def _raw_content(payload: dict[str, Any]) -> str | None:
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices:
         return None
@@ -117,8 +155,7 @@ def _extract_content(payload: dict[str, Any]) -> str | None:
     content = message.get("content")
     if not isinstance(content, str):
         return None
-    explanation = content.strip()
-    return explanation if _valid_explanation(explanation) else None
+    return content
 
 
 def _valid_explanation(explanation: str) -> bool:
