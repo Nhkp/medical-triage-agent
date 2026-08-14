@@ -29,6 +29,7 @@ SYSTEM_PROMPT = (
     '"confidence":0.5}. '
     "Do not output headings such as taxpipeline, Reponse, Réponse, Priority, Explanation, "
     "or Explication. Do not write markdown or prose outside JSON. "
+    "Do not mention v1 rules or copy fallback phrases such as Aucun symptome d'alerte. "
     "The explanation must be 2 to 4 short sentences. Do not use markdown or bullets."
 )
 
@@ -124,7 +125,7 @@ def build_chat_request(payload: dict[str, Any], response: TriageResponse) -> dic
         ],
         "temperature": 0,
         "max_tokens": 160,
-        "stop": ["具有战士user", "具有战士assistant", "\nuser", "\nassistant"],
+        "stop": ["具有战士", "具有战士user", "具有战士assistant", "\nuser", "\nassistant"],
     }
 
 
@@ -132,7 +133,6 @@ def _model_context(payload: dict[str, Any], response: TriageResponse) -> dict[st
     context: dict[str, Any] = {
         "symptoms": payload.get("symptoms", []),
         "rule_priority": response.priority,
-        "draft_explanation": response.explanation,
     }
     for key in _OPTIONAL_CONTEXT_KEYS:
         if key in payload:
@@ -219,11 +219,11 @@ def extract_triage_generation(payload: dict[str, Any]) -> TriageGenerationResult
 def _repair_non_json_generation(
     content: str, preview: str, truncated: bool
 ) -> TriageGenerationResult:
-    first_block = _first_response_block(content)
-    object_result = _repair_object_like_generation(first_block, preview, truncated)
+    object_result = _repair_object_like_generation(content, preview, truncated)
     if object_result is not None:
         return object_result
 
+    first_block = _first_response_block(content)
     priority_match = re.search(
         r"(?im)^\s*(?:r[eé]ponse|priority)\s*:\s*"
         r"(urgence_maximale|moderee|differee)\b",
@@ -259,7 +259,7 @@ def _repair_non_json_generation(
 
 def _first_response_block(content: str) -> str:
     parts = re.split(
-        r"具有战士\s*(?:user|assistant)\b|^\s*(?:user|assistant)\s*$",
+        r"具有战士|^\s*(?:user|assistant)\s*$",
         content,
         maxsplit=1,
         flags=re.IGNORECASE | re.MULTILINE,
@@ -294,6 +294,8 @@ def _repair_object_like_generation(
     lng = data.get("lng")
     suggested_priority = data.get("suggested_priority")
     if isinstance(lng, str):
+        if lng in TRIAGE_ORDER:
+            suggested_priority = lng
         priority_match = re.search(
             r"\br[eé]ponse\s*:\s*(urgence_maximale|moderee|differee)\b",
             lng,
@@ -436,6 +438,8 @@ def _valid_explanation(explanation: str) -> bool:
         return False
     if _has_repeated_sentence(explanation):
         return False
+    if _contains_fallback_template(explanation):
+        return False
     if any(_is_unexpected_script(character) for character in explanation):
         return False
     return not _contains_forbidden_advice(explanation)
@@ -472,6 +476,19 @@ def _contains_forbidden_advice(explanation: str) -> bool:
     return any(fragment in lowered for fragment in forbidden_fragments) or bool(
         re.search(r"\b\d+\s*(mg|ml)\b", lowered)
     )
+
+
+def _contains_fallback_template(explanation: str) -> bool:
+    lowered = explanation.casefold()
+    fallback_fragments = (
+        "aucun symptome d'alerte v1 detecte",
+        "aucun symptôme d'alerte v1 détecté",
+        "symptomes d'alerte detectes",
+        "symptômes d'alerte détectés",
+        "revue clinique necessaire pour confirmer",
+        "revue clinique nécessaire pour confirmer",
+    )
+    return any(fragment in lowered for fragment in fallback_fragments)
 
 
 def _is_unexpected_script(character: str) -> bool:

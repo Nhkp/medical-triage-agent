@@ -264,6 +264,7 @@ def test_vllm_system_prompt_limits_model_to_explanation_role() -> None:
     assert "confidence" in prompt
     assert "first character" in prompt
     assert "taxpipeline" in prompt
+    assert "aucun symptome d'alerte" in prompt
     assert "prose outside json" in prompt
 
 
@@ -283,12 +284,14 @@ def test_vllm_request_context_keeps_only_expected_fields() -> None:
 
     assert '"rule_priority": "urgence_maximale"' in user_payload
     assert '"symptoms": ["douleur thoracique"]' in user_payload
-    assert "draft_explanation" in user_payload
+    assert "draft_explanation" not in user_payload
+    assert "Symptomes d'alerte detectes" not in user_payload
     assert "questionnaire_state" in user_payload
     assert "patient_name" not in user_payload
     assert "unrelated raw field" not in user_payload
     assert request["temperature"] == 0
     assert request["max_tokens"] == 160
+    assert "具有战士" in request["stop"]
     assert "具有战士user" in request["stop"]
     assert "\nassistant" in request["stop"]
 
@@ -395,6 +398,33 @@ def test_vllm_repairs_separator_corrupted_object_from_first_block() -> None:
     assert result.confidence == 1.0
     assert result.llm_response_preview is not None
     assert "How to treat Hypertension" in result.llm_response_preview
+
+
+def test_vllm_repairs_direct_lng_priority_when_explanation_is_generated() -> None:
+    content = (
+        '{lng: "moderee", "explanation": "Les céphalées associées à un nez qui coule '
+        "ne signalent pas ici une urgence immédiate. Une revue clinique reste nécessaire "
+        'pour confirmer la priorité et le contexte.", "confidence": 0.5}'
+        "具有战士\nInitialized a new CHSA medical triage proof-of-concept"
+    )
+    payload = {"choices": [{"message": {"content": content}}]}
+
+    result = extract_explanation(payload)
+
+    assert result.llm_status == "accepted_repaired"
+    assert result.suggested_priority == "moderee"
+    assert result.explanation_source == "llm"
+
+
+def test_vllm_rejects_object_that_copies_rule_fallback_explanation() -> None:
+    content = (
+        '{lng: "moderee", "explanation": "Aucun symptome d\'alerte v1 detecte; '
+        'revue clinique necessaire pour confirmer.", "confidence": 0.5}'
+        "具有战士\nInitialized a new CHSA medical triage proof-of-concept"
+    )
+    payload = {"choices": [{"message": {"content": content}}]}
+
+    assert extract_explanation(payload).llm_status == "invalid_output"
 
 
 def test_api_uses_repaired_separator_corrupted_output(monkeypatch: MonkeyPatch) -> None:
