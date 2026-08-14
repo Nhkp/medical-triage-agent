@@ -23,6 +23,12 @@ SYSTEM_PROMPT = (
     "Use only these priority labels: urgence_maximale, moderee, differee. "
     "Return strict JSON only with keys suggested_priority, explanation, and confidence. "
     "confidence must be a number between 0 and 1. "
+    "The first character of your answer must be { and the last character must be }. "
+    'Example: {"suggested_priority":"moderee","explanation":"The declared symptoms require '
+    'clinical review because uncertainty remains. A clinician must confirm the priority.",'
+    '"confidence":0.5}. '
+    "Do not output headings such as taxpipeline, Reponse, Réponse, Priority, Explanation, "
+    "or Explication. Do not write markdown or prose outside JSON. "
     "The explanation must be 2 to 4 short sentences. Do not use markdown or bullets."
 )
 
@@ -50,7 +56,7 @@ class TriageGenerationResult:
 
     @property
     def explanation_source(self) -> str:
-        return "llm" if self.llm_status == "accepted" else "fallback"
+        return "llm" if self.llm_status in {"accepted", "accepted_repaired"} else "fallback"
 
 
 ExplanationResult = TriageGenerationResult
@@ -166,12 +172,7 @@ def extract_triage_generation(payload: dict[str, Any]) -> TriageGenerationResult
     try:
         data = json.loads(_strip_code_fence(content))
     except json.JSONDecodeError:
-        return TriageGenerationResult(
-            explanation=None,
-            llm_status="bad_response",
-            llm_response_preview=preview,
-            llm_response_truncated=truncated,
-        )
+        return _repair_non_json_generation(content, preview, truncated)
     if not isinstance(data, dict):
         return TriageGenerationResult(
             explanation=None,
@@ -209,6 +210,42 @@ def extract_triage_generation(payload: dict[str, Any]) -> TriageGenerationResult
         llm_status="accepted",
         suggested_priority=str(suggested_priority),
         confidence=float(confidence),
+        llm_response_preview=preview,
+        llm_response_truncated=truncated,
+    )
+
+
+def _repair_non_json_generation(
+    content: str, preview: str, truncated: bool
+) -> TriageGenerationResult:
+    priority_match = re.search(
+        r"(?im)^\s*(?:r[eé]ponse|priority)\s*:\s*"
+        r"(urgence_maximale|moderee|differee)\b",
+        content,
+    )
+    explanation_match = re.search(r"(?ims)^\s*(?:explanation|explication)\s*:\s*(.+)$", content)
+    if priority_match is None or explanation_match is None:
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="bad_response",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
+
+    suggested_priority = priority_match.group(1)
+    explanation = explanation_match.group(1).strip()
+    if suggested_priority not in TRIAGE_ORDER or not _valid_explanation(explanation):
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="invalid_output",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
+    return TriageGenerationResult(
+        explanation=explanation,
+        llm_status="accepted_repaired",
+        suggested_priority=suggested_priority,
+        confidence=0.5,
         llm_response_preview=preview,
         llm_response_truncated=truncated,
     )
@@ -257,9 +294,23 @@ def _valid_explanation(explanation: str) -> bool:
         return False
     if re.search(r"(.)\1{7,}", explanation):
         return False
+    if _has_repeated_sentence(explanation):
+        return False
     if any(_is_unexpected_script(character) for character in explanation):
         return False
     return not _contains_forbidden_advice(explanation)
+
+
+def _has_repeated_sentence(explanation: str) -> bool:
+    seen: set[str] = set()
+    for sentence in re.split(r"[.!?]+", explanation):
+        normalized = re.sub(r"\s+", " ", sentence.strip().casefold())
+        if len(normalized) < 12:
+            continue
+        if normalized in seen:
+            return True
+        seen.add(normalized)
+    return False
 
 
 def _contains_forbidden_advice(explanation: str) -> bool:
