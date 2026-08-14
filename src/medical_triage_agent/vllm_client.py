@@ -124,6 +124,7 @@ def build_chat_request(payload: dict[str, Any], response: TriageResponse) -> dic
         ],
         "temperature": 0,
         "max_tokens": 160,
+        "stop": ["具有战士user", "具有战士assistant", "\nuser", "\nassistant"],
     }
 
 
@@ -218,12 +219,17 @@ def extract_triage_generation(payload: dict[str, Any]) -> TriageGenerationResult
 def _repair_non_json_generation(
     content: str, preview: str, truncated: bool
 ) -> TriageGenerationResult:
+    first_block = _first_response_block(content)
+    object_result = _repair_object_like_generation(first_block, preview, truncated)
+    if object_result is not None:
+        return object_result
+
     priority_match = re.search(
         r"(?im)^\s*(?:r[eé]ponse|priority)\s*:\s*"
         r"(urgence_maximale|moderee|differee)\b",
-        content,
+        first_block,
     )
-    explanation_match = re.search(r"(?ims)^\s*(?:explanation|explication)\s*:\s*(.+)$", content)
+    explanation_match = re.search(r"(?ims)^\s*(?:explanation|explication)\s*:\s*(.+)$", first_block)
     if priority_match is None or explanation_match is None:
         return TriageGenerationResult(
             explanation=None,
@@ -246,6 +252,140 @@ def _repair_non_json_generation(
         llm_status="accepted_repaired",
         suggested_priority=suggested_priority,
         confidence=0.5,
+        llm_response_preview=preview,
+        llm_response_truncated=truncated,
+    )
+
+
+def _first_response_block(content: str) -> str:
+    parts = re.split(
+        r"具有战士\s*(?:user|assistant)\b|^\s*(?:user|assistant)\s*$",
+        content,
+        maxsplit=1,
+        flags=re.IGNORECASE | re.MULTILINE,
+    )
+    return parts[0]
+
+
+def _repair_object_like_generation(
+    content: str, preview: str, truncated: bool
+) -> TriageGenerationResult | None:
+    candidate = _first_braced_object(content)
+    if candidate is None:
+        return None
+
+    try:
+        data = json.loads(_quote_unquoted_object_keys(candidate))
+    except json.JSONDecodeError:
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="bad_response",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
+    if not isinstance(data, dict):
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="bad_response",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
+
+    lng = data.get("lng")
+    suggested_priority = data.get("suggested_priority")
+    if isinstance(lng, str):
+        priority_match = re.search(
+            r"\br[eé]ponse\s*:\s*(urgence_maximale|moderee|differee)\b",
+            lng,
+            flags=re.IGNORECASE,
+        )
+        if priority_match is not None:
+            suggested_priority = priority_match.group(1)
+    if not isinstance(explanation := data.get("explanation"), str):
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="bad_response",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
+
+    return _accepted_or_invalid_result(
+        suggested_priority=suggested_priority,
+        explanation=explanation,
+        confidence=data.get("confidence"),
+        preview=preview,
+        truncated=truncated,
+        repaired=True,
+    )
+
+
+def _first_braced_object(content: str) -> str | None:
+    start = content.find("{")
+    if start < 0:
+        return None
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for index, character in enumerate(content[start:], start=start):
+        if in_string:
+            if escaped:
+                escaped = False
+            elif character == "\\":
+                escaped = True
+            elif character == '"':
+                in_string = False
+            continue
+        if character == '"':
+            in_string = True
+        elif character == "{":
+            depth += 1
+        elif character == "}":
+            depth -= 1
+            if depth == 0:
+                return content[start : index + 1]
+    return None
+
+
+def _quote_unquoted_object_keys(candidate: str) -> str:
+    return re.sub(r"([,{]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:", r'\1"\2":', candidate)
+
+
+def _accepted_or_invalid_result(
+    *,
+    suggested_priority: object,
+    explanation: object,
+    confidence: object,
+    preview: str,
+    truncated: bool,
+    repaired: bool,
+) -> TriageGenerationResult:
+    if suggested_priority not in TRIAGE_ORDER or not isinstance(explanation, str):
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="invalid_output",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
+    if not _valid_explanation(explanation):
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="invalid_output",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
+    if not isinstance(confidence, int | float) or not 0 <= float(confidence) <= 1:
+        return TriageGenerationResult(
+            explanation=None,
+            llm_status="invalid_output",
+            llm_response_preview=preview,
+            llm_response_truncated=truncated,
+        )
+    return TriageGenerationResult(
+        explanation=explanation.strip(),
+        llm_status="accepted_repaired" if repaired else "accepted",
+        suggested_priority=str(suggested_priority),
+        confidence=float(confidence),
         llm_response_preview=preview,
         llm_response_truncated=truncated,
     )
@@ -323,6 +463,11 @@ def _contains_forbidden_advice(explanation: str) -> bool:
         "prenez ",
         "donnez ",
         "administer ",
+        "how to treat",
+        "traitement par",
+        "médicament",
+        "medicament",
+        "antihypertenseur",
     )
     return any(fragment in lowered for fragment in forbidden_fragments) or bool(
         re.search(r"\b\d+\s*(mg|ml)\b", lowered)

@@ -289,6 +289,8 @@ def test_vllm_request_context_keeps_only_expected_fields() -> None:
     assert "unrelated raw field" not in user_payload
     assert request["temperature"] == 0
     assert request["max_tokens"] == 160
+    assert "具有战士user" in request["stop"]
+    assert "\nassistant" in request["stop"]
 
 
 def test_vllm_accepts_valid_french_and_english_explanations() -> None:
@@ -372,6 +374,97 @@ def test_vllm_repairs_known_non_json_output_patterns() -> None:
         assert result.suggested_priority == expected_priority
         assert result.confidence == 0.5
         assert result.llm_response_preview is not None
+
+
+def test_vllm_repairs_separator_corrupted_object_from_first_block() -> None:
+    content = (
+        '{lng: "Reponse: urgence_maximale", "confidence": 1.0, "explanation": '
+        "\"Les symptômes d'alerte indiquent une urgence maximale. La douleur thoracique "
+        'et la difficulté respiratoire nécessitent une revue clinique immédiate."}'
+        "具有战士\n具有战士user\nAnswer the medical question: How to treat Hypertension ?"
+        "具有战士\n具有战士assistant\n"
+        '{lng: "Reponse: traitement par un médicament antihypertenseur", "confidence": 1.0}'
+    )
+    payload = {"choices": [{"message": {"content": content}}]}
+
+    result = extract_explanation(payload)
+
+    assert result.llm_status == "accepted_repaired"
+    assert result.explanation_source == "llm"
+    assert result.suggested_priority == "urgence_maximale"
+    assert result.confidence == 1.0
+    assert result.llm_response_preview is not None
+    assert "How to treat Hypertension" in result.llm_response_preview
+
+
+def test_api_uses_repaired_separator_corrupted_output(monkeypatch: MonkeyPatch) -> None:
+    content = (
+        '{lng: "Reponse: urgence_maximale", "confidence": 1.0, "explanation": '
+        "\"Les symptômes d'alerte indiquent une urgence maximale. La douleur thoracique "
+        'et la difficulté respiratoire nécessitent une revue clinique immédiate."}'
+        "具有战士\n具有战士user\nAnswer the medical question: How to treat Hypertension ?"
+    )
+    payload = {"choices": [{"message": {"content": content}}]}
+
+    def fake_urlopen(_request: Any, timeout: float | None) -> _Response:
+        return _Response(json.dumps(payload).encode("utf-8"))
+
+    monkeypatch.setenv("VLLM_BASE_URL", "http://vllm.test/v1")
+    monkeypatch.setattr("medical_triage_agent.vllm_client.urlopen", fake_urlopen)
+
+    response = api.triage({"symptoms": ["douleur thoracique", "difficulte respiratoire"]})
+    audit_record = api.audit(response["audit_id"])
+
+    assert response["priority"] == "urgence_maximale"
+    assert response["llm_priority"] == "urgence_maximale"
+    assert response["priority_source"] == "shared"
+    assert response["arbitration"] == "matched"
+    assert response["explanation_source"] == "llm"
+    assert response["llm_status"] == "accepted_repaired"
+    assert audit_record is not None
+    assert "How to treat Hypertension" in audit_record["llm_response_preview"]
+    assert "douleur thoracique" not in str(audit_record["payload_hash"])
+
+
+def test_vllm_rejects_object_when_explanation_contains_separator_noise() -> None:
+    content = (
+        '{lng: "Reponse: urgence_maximale", "confidence": 1.0, "explanation": '
+        '"Les symptômes imposent une revue clinique immédiate 具有战士."}'
+    )
+    payload = {"choices": [{"message": {"content": content}}]}
+
+    assert extract_explanation(payload).llm_status == "invalid_output"
+
+
+def test_vllm_rejects_object_when_qa_continuation_enters_explanation() -> None:
+    content = (
+        '{lng: "Reponse: moderee", "confidence": 1.0, "explanation": '
+        '"The symptoms require clinical review. How to treat Hypertension ?"}'
+    )
+    payload = {"choices": [{"message": {"content": content}}]}
+
+    assert extract_explanation(payload).llm_status == "invalid_output"
+
+
+def test_vllm_rejects_object_with_invalid_lng_priority() -> None:
+    content = (
+        '{lng: "Reponse: critical", "confidence": 1.0, "explanation": '
+        '"Les symptomes declares necessitent une revue clinique. '
+        'Un professionnel doit confirmer la priorite."}'
+    )
+    payload = {"choices": [{"message": {"content": content}}]}
+
+    assert extract_explanation(payload).llm_status == "invalid_output"
+
+
+def test_vllm_bad_response_for_object_without_usable_explanation() -> None:
+    payload = {
+        "choices": [
+            {"message": {"content": '{lng: "Reponse: urgence_maximale", "confidence": 1.0}'}}
+        ]
+    }
+
+    assert extract_explanation(payload).llm_status == "bad_response"
 
 
 def test_vllm_rejects_repaired_repeated_explanation() -> None:
