@@ -12,6 +12,7 @@ prescribe, discharge, or replace clinician judgment.
 - Explain uncertainty plainly.
 - Prefer conservative triage when severe symptoms are present.
 - Refuse dangerous treatment instructions and redirect to clinical staff.
+- Treat LLM priority output as a suggestion only; backend rules keep final arbitration authority.
 
 ## Red flags for v1
 

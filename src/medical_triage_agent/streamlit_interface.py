@@ -116,6 +116,22 @@ def _render_triage(result: ApiResult) -> None:
         st.error(f"Urgent escalation: {priority}")
     else:
         st.info(f"Priority: {priority}")
+    rule_priority = result.data.get("rule_priority", "unknown")
+    llm_priority = result.data.get("llm_priority") or "none"
+    llm_confidence = result.data.get("llm_confidence") or "none"
+    priority_source = result.data.get("priority_source", "unknown")
+    arbitration = result.data.get("arbitration", "unknown")
+    st.write(
+        {
+            "rule_priority": rule_priority,
+            "llm_priority": llm_priority,
+            "llm_confidence": llm_confidence,
+            "priority_source": priority_source,
+            "arbitration": arbitration,
+        }
+    )
+    if arbitration == "rule_escalated":
+        st.warning("Backend safety rules overrode a lower LLM priority suggestion.")
     source = result.data.get("explanation_source", "unknown")
     llm_status = result.data.get("llm_status", "unknown")
     if source == "llm":

@@ -52,6 +52,10 @@ def test_api_audit_returns_metadata_without_raw_patient_text() -> None:
 
     assert audit_record is not None
     assert audit_record["priority"] == "moderee"
+    assert audit_record["rule_priority"] == "moderee"
+    assert audit_record["llm_priority"] is None
+    assert audit_record["priority_source"] == "rule"
+    assert audit_record["arbitration"] == "rule_only"
     assert audit_record["model"] == "rule_based_v1"
     assert audit_record["explanation_source"] == "fallback"
     assert audit_record["llm_status"] == "not_configured"
@@ -76,13 +80,17 @@ def test_invalid_vllm_explanation_falls_back(monkeypatch: MonkeyPatch) -> None:
     monkeypatch.setenv("VLLM_BASE_URL", "http://vllm.test/v1")
     monkeypatch.setattr(
         api,
-        "generate_explanation",
+        "generate_triage",
         lambda _payload, _response: ExplanationResult(None, "invalid_output"),
     )
 
     response = api.triage({"symptoms": ["douleur thoracique", "difficulte respiratoire"]})
 
     assert response["priority"] == "urgence_maximale"
+    assert response["rule_priority"] == "urgence_maximale"
+    assert response["llm_priority"] == ""
+    assert response["priority_source"] == "rule"
+    assert response["arbitration"] == "rule_only"
     assert response["explanation_source"] == "fallback"
     assert response["llm_status"] == "invalid_output"
     assert (
@@ -97,19 +105,84 @@ def test_valid_vllm_explanation_is_used(monkeypatch: MonkeyPatch) -> None:
     )
     monkeypatch.setattr(
         api,
-        "generate_explanation",
-        lambda _payload, _response: ExplanationResult(explanation, "accepted"),
+        "generate_triage",
+        lambda _payload, _response: ExplanationResult(
+            explanation, "accepted", "urgence_maximale", 0.8
+        ),
     )
 
     response = api.triage({"symptoms": ["douleur thoracique"]})
 
     assert response["explanation"] == explanation
+    assert response["priority"] == "urgence_maximale"
+    assert response["rule_priority"] == "urgence_maximale"
+    assert response["llm_priority"] == "urgence_maximale"
+    assert response["llm_confidence"] == "0.8"
+    assert response["priority_source"] == "shared"
+    assert response["arbitration"] == "matched"
     assert response["explanation_source"] == "llm"
     assert response["llm_status"] == "accepted"
 
 
+def test_llm_can_escalate_non_red_flag_priority(monkeypatch: MonkeyPatch) -> None:
+    explanation = (
+        "Cette situation justifie une evaluation clinique urgente malgre l'absence de red flag exact. "
+        "Les elements restent declaratifs et doivent etre verifies par un soignant."
+    )
+    monkeypatch.setattr(
+        api,
+        "generate_triage",
+        lambda _payload, _response: ExplanationResult(
+            explanation, "accepted", "urgence_maximale", 0.7
+        ),
+    )
+
+    response = api.triage({"symptoms": ["malaise important"]})
+
+    assert response["priority"] == "urgence_maximale"
+    assert response["rule_priority"] == "moderee"
+    assert response["llm_priority"] == "urgence_maximale"
+    assert response["priority_source"] == "llm"
+    assert response["arbitration"] == "llm_escalated"
+
+
+def test_rules_override_lower_llm_priority_for_red_flag(monkeypatch: MonkeyPatch) -> None:
+    explanation = (
+        "La suggestion du modele reste incertaine et doit etre revue par un clinicien. "
+        "Les symptomes declares imposent une verification clinique immediate."
+    )
+    monkeypatch.setattr(
+        api,
+        "generate_triage",
+        lambda _payload, _response: ExplanationResult(explanation, "accepted", "differee", 0.6),
+    )
+
+    response = api.triage({"symptoms": ["douleur thoracique"]})
+
+    assert response["priority"] == "urgence_maximale"
+    assert response["rule_priority"] == "urgence_maximale"
+    assert response["llm_priority"] == "differee"
+    assert response["priority_source"] == "rule"
+    assert response["arbitration"] == "rule_escalated"
+
+
 def test_vllm_rejects_non_latin_repetitive_output() -> None:
-    payload = {"choices": [{"message": {"content": "具有战士ันันันันันันันันันันันันันันันันันันันันันันันัน"}}]}
+    payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "suggested_priority": "moderee",
+                            "explanation": "具有战士ันันันันันันันันันันันันันันันันันันันันันันันัน",
+                            "confidence": 0.8,
+                        },
+                        ensure_ascii=False,
+                    )
+                }
+            }
+        ]
+    }
 
     assert _extract_content(payload) is None
     assert extract_explanation(payload).llm_status == "invalid_output"
@@ -118,13 +191,13 @@ def test_vllm_rejects_non_latin_repetitive_output() -> None:
 def test_vllm_system_prompt_limits_model_to_explanation_role() -> None:
     prompt = SYSTEM_PROMPT.casefold()
 
-    assert "only to explain" in prompt
-    assert "do not change" in prompt
+    assert "suggest one triage priority" in prompt
+    assert "backend keeps final authority" in prompt
     assert "latin-script french or english" in prompt
     assert "do not provide a diagnosis" in prompt
     assert "human clinical review remains required" in prompt
-    assert "urgence_maximale" in prompt
-    assert "immediate clinical review or escalation" in prompt
+    assert "suggested_priority" in prompt
+    assert "confidence" in prompt
 
 
 def test_vllm_request_context_keeps_only_expected_fields() -> None:
@@ -141,7 +214,7 @@ def test_vllm_request_context_keeps_only_expected_fields() -> None:
 
     user_payload = request["messages"][1]["content"]
 
-    assert '"priority": "urgence_maximale"' in user_payload
+    assert '"rule_priority": "urgence_maximale"' in user_payload
     assert '"symptoms": ["douleur thoracique"]' in user_payload
     assert "draft_explanation" in user_payload
     assert "questionnaire_state" in user_payload
@@ -156,9 +229,15 @@ def test_vllm_accepts_valid_french_and_english_explanations() -> None:
         "choices": [
             {
                 "message": {
-                    "content": (
-                        "Cette priorite impose une revue clinique immediate. "
-                        "Les elements declares restent incertains et doivent etre confirmes par un professionnel."
+                    "content": json.dumps(
+                        {
+                            "suggested_priority": "urgence_maximale",
+                            "explanation": (
+                                "Cette priorite impose une revue clinique immediate. "
+                                "Les elements declares restent incertains et doivent etre confirmes par un professionnel."
+                            ),
+                            "confidence": 0.9,
+                        }
                     )
                 }
             }
@@ -168,9 +247,15 @@ def test_vllm_accepts_valid_french_and_english_explanations() -> None:
         "choices": [
             {
                 "message": {
-                    "content": (
-                        "This priority requires immediate clinical review. "
-                        "The declared symptoms remain uncertain and must be confirmed by a clinician."
+                    "content": json.dumps(
+                        {
+                            "suggested_priority": "urgence_maximale",
+                            "explanation": (
+                                "This priority requires immediate clinical review. "
+                                "The declared symptoms remain uncertain and must be confirmed by a clinician."
+                            ),
+                            "confidence": 0.8,
+                        }
                     )
                 }
             }
@@ -184,7 +269,19 @@ def test_vllm_accepts_valid_french_and_english_explanations() -> None:
 
 def test_vllm_rejects_diagnostic_or_treatment_advice() -> None:
     diagnostic = {
-        "choices": [{"message": {"content": "The diagnosis is asthma. Take 500 mg now."}}]
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "suggested_priority": "moderee",
+                            "explanation": "The diagnosis is asthma. Take 500 mg now.",
+                            "confidence": 0.8,
+                        }
+                    )
+                }
+            }
+        ]
     }
 
     assert _extract_content(diagnostic) is None
@@ -193,6 +290,33 @@ def test_vllm_rejects_diagnostic_or_treatment_advice() -> None:
 
 def test_vllm_bad_response_has_distinct_status() -> None:
     assert extract_explanation({"choices": []}).llm_status == "bad_response"
+    assert (
+        extract_explanation({"choices": [{"message": {"content": "not json"}}]}).llm_status
+        == "bad_response"
+    )
+
+
+def test_vllm_rejects_invalid_priority_label() -> None:
+    payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "suggested_priority": "critical",
+                            "explanation": (
+                                "Cette reponse reste incertaine et doit etre revue par un clinicien. "
+                                "La priorite doit etre confirmee avec le contexte clinique."
+                            ),
+                            "confidence": 0.8,
+                        }
+                    )
+                }
+            }
+        ]
+    }
+
+    assert extract_explanation(payload).llm_status == "invalid_output"
 
 
 def test_vllm_timeout_defaults_to_none(monkeypatch: MonkeyPatch) -> None:
@@ -214,7 +338,21 @@ def test_generate_explanation_returns_llm_status_for_valid_response(
         "Cette priorite necessite une revue clinique immediate. "
         "Les signes declares doivent etre confirmes par un professionnel de sante."
     )
-    payload = {"choices": [{"message": {"content": explanation}}]}
+    payload = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "suggested_priority": "urgence_maximale",
+                            "explanation": explanation,
+                            "confidence": 0.9,
+                        }
+                    )
+                }
+            }
+        ]
+    }
 
     def fake_urlopen(_request: Any, timeout: float | None) -> _Response:
         assert timeout is None
@@ -232,6 +370,8 @@ def test_generate_explanation_returns_llm_status_for_valid_response(
     assert result.explanation == explanation
     assert result.explanation_source == "llm"
     assert result.llm_status == "accepted"
+    assert result.suggested_priority == "urgence_maximale"
+    assert result.confidence == 0.9
 
 
 def test_generate_explanation_reports_timeout(monkeypatch: MonkeyPatch) -> None:

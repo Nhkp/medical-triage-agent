@@ -155,8 +155,11 @@ make eval-models
 
 ## Deployment
 
-Current API supports a rule-based fallback and optional vLLM-compatible chat completions via
-`VLLM_BASE_URL`, `VLLM_MODEL_ID`, `VLLM_TIMEOUT_SECONDS`, and `API_KEY`.
+Current API supports LLM-assisted triage suggestions through a vLLM-compatible chat endpoint via
+`VLLM_BASE_URL`, `VLLM_MODEL_ID`, `VLLM_TIMEOUT_SECONDS`, and `API_KEY`. The LLM returns a
+structured priority suggestion, explanation, and confidence; the FastAPI wrapper keeps final
+authority by applying a conservative rule-based safety floor before returning the final priority.
+This is not autonomous triage and still requires clinician review.
 
 Step 3 local deployment status:
 

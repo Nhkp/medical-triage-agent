@@ -8,6 +8,8 @@ from typing import Any
 
 from medical_triage_agent.privacy import redact_pii
 
+TRIAGE_ORDER = {"differee": 0, "moderee": 1, "urgence_maximale": 2}
+
 DISCLAIMER = (
     "POC d'aide au triage: cette evaluation ne remplace pas la decision d'un professionnel "
     "de sante."
@@ -48,10 +50,20 @@ class TriageResponse:
     audit_id: str
     explanation_source: str = "fallback"
     llm_status: str = "not_configured"
+    rule_priority: str | None = None
+    llm_priority: str | None = None
+    llm_confidence: float | None = None
+    priority_source: str = "rule"
+    arbitration: str = "rule_only"
 
     def to_dict(self) -> dict[str, str]:
         return {
             "priority": self.priority,
+            "rule_priority": self.rule_priority or self.priority,
+            "llm_priority": self.llm_priority or "",
+            "llm_confidence": "" if self.llm_confidence is None else str(self.llm_confidence),
+            "priority_source": self.priority_source,
+            "arbitration": self.arbitration,
             "explanation": self.explanation,
             "disclaimer": self.disclaimer,
             "audit_id": self.audit_id,
@@ -101,6 +113,11 @@ def audit_metadata(
     return {
         "audit_id": response.audit_id,
         "priority": response.priority,
+        "rule_priority": response.rule_priority or response.priority,
+        "llm_priority": response.llm_priority,
+        "llm_confidence": response.llm_confidence,
+        "priority_source": response.priority_source,
+        "arbitration": response.arbitration,
         "model": model,
         "explanation_source": response.explanation_source,
         "llm_status": response.llm_status,

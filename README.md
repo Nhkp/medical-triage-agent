@@ -37,8 +37,8 @@ datasets and LoRA adapters. Full training artifacts are not claimed until run lo
 repositories exist.
 
 Serving is designed around a vLLM OpenAI-compatible backend behind a thin FastAPI wrapper. The
-wrapper owns domain validation, safety disclaimers, metadata-only audit traces, and the stable
-`/health`, `/triage`, and `/audit/{id}` API surface.
+wrapper owns domain validation, safety disclaimers, conservative priority arbitration,
+metadata-only audit traces, and the stable `/health`, `/triage`, and `/audit/{id}` API surface.
 
 ## Architecture
 
@@ -58,7 +58,7 @@ demonstration API with audit metadata and safety evaluation.
 - `make data-audit` validates schema, provenance, duplicate content, split isolation, and
   obvious PII findings for generated data.
 - The API scaffold exposes `/health`, `/triage`, and `/audit/{id}` with metadata-only audit
-  responses and an optional vLLM-compatible client path.
+  responses, optional vLLM priority suggestions, and backend safety arbitration.
 - SFT, DPO, and optional GRPO scripts have YAML configs and CPU-safe dry-run smoke commands
   before full GPU jobs.
 

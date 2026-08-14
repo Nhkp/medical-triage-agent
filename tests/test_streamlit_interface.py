@@ -24,6 +24,33 @@ class _Response:
         return self._payload
 
 
+class _FakeStreamlit:
+    def __init__(self) -> None:
+        self.session_state: dict[str, str] = {}
+        self.messages: list[tuple[str, Any]] = []
+
+    def error(self, value: Any) -> None:
+        self.messages.append(("error", value))
+
+    def info(self, value: Any) -> None:
+        self.messages.append(("info", value))
+
+    def success(self, value: Any) -> None:
+        self.messages.append(("success", value))
+
+    def warning(self, value: Any) -> None:
+        self.messages.append(("warning", value))
+
+    def write(self, value: Any) -> None:
+        self.messages.append(("write", value))
+
+    def caption(self, value: Any) -> None:
+        self.messages.append(("caption", value))
+
+    def code(self, value: Any) -> None:
+        self.messages.append(("code", value))
+
+
 def test_parse_symptoms_trims_blank_lines() -> None:
     assert ui.parse_symptoms(" douleur \n\n toux \n") == ["douleur", "toux"]
 
@@ -71,3 +98,33 @@ def test_request_json_reports_connection_error(monkeypatch: Any) -> None:
 
     assert result.ok is False
     assert "offline" in str(result.error)
+
+
+def test_render_triage_warns_when_rules_override_llm(monkeypatch: Any) -> None:
+    fake = _FakeStreamlit()
+    monkeypatch.setattr(ui, "import_module", lambda _name: fake)
+
+    ui._render_triage(
+        ui.ApiResult(
+            ok=True,
+            data={
+                "priority": "urgence_maximale",
+                "rule_priority": "urgence_maximale",
+                "llm_priority": "differee",
+                "llm_confidence": "0.6",
+                "priority_source": "rule",
+                "arbitration": "rule_escalated",
+                "explanation_source": "llm",
+                "llm_status": "accepted",
+                "explanation": "Revue clinique immediate requise.",
+                "disclaimer": "POC.",
+                "audit_id": "audit_test",
+            },
+        )
+    )
+
+    assert (
+        "warning",
+        "Backend safety rules overrode a lower LLM priority suggestion.",
+    ) in fake.messages
+    assert ("code", "audit_test") in fake.messages

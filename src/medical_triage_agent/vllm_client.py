@@ -9,18 +9,20 @@ from typing import Any
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
-from medical_triage_agent.triage import TriageResponse
+from medical_triage_agent.triage import TRIAGE_ORDER, TriageResponse
 
 SYSTEM_PROMPT = (
     "You are a CHSA medical triage proof-of-concept assistant for clinical staff. "
-    "Your role is only to explain the triage priority already provided by the backend; "
-    "do not change, contradict, or replace that priority. "
+    "Interpret the declared symptoms and suggest one triage priority. "
+    "The backend keeps final authority and may override your suggestion for safety. "
     "Answer in the same language as the symptoms: French for French input, English otherwise. "
     "Use only Latin-script French or English. Do not use any other language or script. "
     "Do not provide a diagnosis, medication, dosage, or home-treatment instructions. "
     "Mention uncertainty and that human clinical review remains required. "
-    "If the priority is urgence_maximale, explicitly mention immediate clinical review or escalation. "
-    "Write 2 to 4 short sentences. Do not use markdown, bullets, or JSON."
+    "Use only these priority labels: urgence_maximale, moderee, differee. "
+    "Return strict JSON only with keys suggested_priority, explanation, and confidence. "
+    "confidence must be a number between 0 and 1. "
+    "The explanation must be 2 to 4 short sentences. Do not use markdown or bullets."
 )
 
 _OPTIONAL_CONTEXT_KEYS = (
@@ -37,13 +39,18 @@ _OPTIONAL_CONTEXT_KEYS = (
 
 
 @dataclass(frozen=True)
-class ExplanationResult:
+class TriageGenerationResult:
     explanation: str | None
     llm_status: str
+    suggested_priority: str | None = None
+    confidence: float | None = None
 
     @property
     def explanation_source(self) -> str:
         return "llm" if self.llm_status == "accepted" else "fallback"
+
+
+ExplanationResult = TriageGenerationResult
 
 
 def configured_model() -> str:
@@ -54,10 +61,10 @@ def is_configured() -> bool:
     return bool(os.environ.get("VLLM_BASE_URL"))
 
 
-def generate_explanation(payload: dict[str, Any], response: TriageResponse) -> ExplanationResult:
+def generate_triage(payload: dict[str, Any], response: TriageResponse) -> TriageGenerationResult:
     base_url = os.environ.get("VLLM_BASE_URL")
     if not base_url:
-        return ExplanationResult(explanation=None, llm_status="not_configured")
+        return TriageGenerationResult(explanation=None, llm_status="not_configured")
 
     request_payload = build_chat_request(payload, response)
     data = json.dumps(request_payload).encode("utf-8")
@@ -71,13 +78,17 @@ def generate_explanation(payload: dict[str, Any], response: TriageResponse) -> E
         with urlopen(request, timeout=_request_timeout()) as raw:
             response_payload = json.loads(raw.read().decode("utf-8"))
     except TimeoutError:
-        return ExplanationResult(explanation=None, llm_status="timeout")
+        return TriageGenerationResult(explanation=None, llm_status="timeout")
     except (OSError, URLError):
-        return ExplanationResult(explanation=None, llm_status="connection_error")
+        return TriageGenerationResult(explanation=None, llm_status="connection_error")
     except json.JSONDecodeError:
-        return ExplanationResult(explanation=None, llm_status="bad_response")
+        return TriageGenerationResult(explanation=None, llm_status="bad_response")
 
-    return extract_explanation(response_payload)
+    return extract_triage_generation(response_payload)
+
+
+def generate_explanation(payload: dict[str, Any], response: TriageResponse) -> ExplanationResult:
+    return generate_triage(payload, response)
 
 
 def build_chat_request(payload: dict[str, Any], response: TriageResponse) -> dict[str, Any]:
@@ -103,7 +114,7 @@ def build_chat_request(payload: dict[str, Any], response: TriageResponse) -> dic
 def _model_context(payload: dict[str, Any], response: TriageResponse) -> dict[str, Any]:
     context: dict[str, Any] = {
         "symptoms": payload.get("symptoms", []),
-        "priority": response.priority,
+        "rule_priority": response.priority,
         "draft_explanation": response.explanation,
     }
     for key in _OPTIONAL_CONTEXT_KEYS:
@@ -128,13 +139,35 @@ def _request_timeout() -> float | None:
 
 
 def extract_explanation(payload: dict[str, Any]) -> ExplanationResult:
+    return extract_triage_generation(payload)
+
+
+def extract_triage_generation(payload: dict[str, Any]) -> TriageGenerationResult:
     content = _raw_content(payload)
     if content is None:
-        return ExplanationResult(explanation=None, llm_status="bad_response")
-    explanation = content.strip()
+        return TriageGenerationResult(explanation=None, llm_status="bad_response")
+    try:
+        data = json.loads(_strip_code_fence(content))
+    except json.JSONDecodeError:
+        return TriageGenerationResult(explanation=None, llm_status="bad_response")
+    if not isinstance(data, dict):
+        return TriageGenerationResult(explanation=None, llm_status="bad_response")
+
+    suggested_priority = data.get("suggested_priority")
+    explanation = data.get("explanation")
+    confidence = data.get("confidence")
+    if suggested_priority not in TRIAGE_ORDER or not isinstance(explanation, str):
+        return TriageGenerationResult(explanation=None, llm_status="invalid_output")
     if not _valid_explanation(explanation):
-        return ExplanationResult(explanation=None, llm_status="invalid_output")
-    return ExplanationResult(explanation=explanation, llm_status="accepted")
+        return TriageGenerationResult(explanation=None, llm_status="invalid_output")
+    if not isinstance(confidence, int | float) or not 0 <= float(confidence) <= 1:
+        return TriageGenerationResult(explanation=None, llm_status="invalid_output")
+    return TriageGenerationResult(
+        explanation=explanation.strip(),
+        llm_status="accepted",
+        suggested_priority=str(suggested_priority),
+        confidence=float(confidence),
+    )
 
 
 def _extract_content(payload: dict[str, Any]) -> str | None:
@@ -156,6 +189,16 @@ def _raw_content(payload: dict[str, Any]) -> str | None:
     if not isinstance(content, str):
         return None
     return content
+
+
+def _strip_code_fence(content: str) -> str:
+    stripped = content.strip()
+    if not stripped.startswith("```"):
+        return stripped
+    lines = stripped.splitlines()
+    if len(lines) >= 3 and lines[-1].strip() == "```":
+        return "\n".join(lines[1:-1]).strip()
+    return stripped
 
 
 def _valid_explanation(explanation: str) -> bool:
