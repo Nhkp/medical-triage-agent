@@ -36,6 +36,15 @@ def test_health_reports_rule_based_fallback() -> None:
     assert api.health() == {"status": "ok", "model": "rule_based_v1", "vllm": "disabled"}
 
 
+def test_demo_html_points_to_existing_endpoints() -> None:
+    html = api.demo_html()
+
+    assert 'fetch("/health")' in html
+    assert 'fetch("/triage"' in html
+    assert "fetch(`/audit/" in html
+    assert "diagnosis" not in html.casefold()
+
+
 def test_api_rejects_empty_symptom_payload() -> None:
     try:
         api.triage({})
