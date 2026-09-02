@@ -22,7 +22,7 @@ SFT_HUB_MODEL_ID_8K ?= Lokhidor/medical-triage-qwen3-sft-lora-8k
 DPO_HUB_MODEL_ID_8K ?= Lokhidor/medical-triage-qwen3-dpo-lora-8k
 
 # Local MLflow tracking configuration for experiment metadata and Trainer metrics.
-MLFLOW_TRACKING_URI ?= mlruns
+MLFLOW_TRACKING_URI ?= sqlite:///mlflow.db
 MLFLOW_EXPERIMENT_NAME ?= medical-triage-agent
 MLFLOW_UI_PORT ?= 5000
 MLFLOW_NGROK ?= 0

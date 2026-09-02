@@ -256,7 +256,7 @@ def argparse_namespace(**overrides: Any) -> Any:
         "push_to_hub": False,
         "sft_hub_model_id": None,
         "dpo_hub_model_id": None,
-        "mlflow_tracking_uri": "mlruns",
+        "mlflow_tracking_uri": "sqlite:///mlflow.db",
         "mlflow_ui_host": "127.0.0.1",
         "mlflow_ui_port": 5000,
         "mlflow_ngrok": False,

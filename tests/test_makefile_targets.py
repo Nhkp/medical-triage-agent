@@ -57,6 +57,7 @@ def test_makefile_exposes_data_preparation_targets() -> None:
     assert "--dataset-repo $(HF_DATASET_REPO_8K)" in makefile
     assert "MLFLOW_NGROK_ARG" in makefile
     assert "--mlflow-ngrok --mlflow-ui-port $(MLFLOW_UI_PORT)" in makefile
+    assert "MLFLOW_TRACKING_URI ?= sqlite:///mlflow.db" in makefile
     assert "mlflow ui --backend-store-uri $(MLFLOW_TRACKING_URI)" in makefile
     assert "scripts/evaluate.py" in makefile
     assert "scripts/evaluate_model_comparison.py" in makefile

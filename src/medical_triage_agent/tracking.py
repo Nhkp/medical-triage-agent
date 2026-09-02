@@ -7,7 +7,7 @@ from typing import Any, cast
 from medical_triage_agent.configuration import TrainingConfig
 
 DEFAULT_EXPERIMENT_NAME = "medical-triage-agent"
-DEFAULT_TRACKING_URI = "mlruns"
+DEFAULT_TRACKING_URI = "sqlite:///mlflow.db"
 
 
 def load_manifest(dataset_dir: Path, *, required: bool = True) -> dict[str, Any]:

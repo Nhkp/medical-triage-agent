@@ -108,7 +108,7 @@ def test_kaggle_training_notebook_supports_tracked_5k_and_8k_experiments() -> No
         "--mlflow-ngrok",
         "--mlflow-ui-port",
         "--dry-run",
-        "mlruns outputs/experiments",
+        "mlflow.db mlruns outputs/experiments",
     ):
         assert expected in source
 
