@@ -26,6 +26,8 @@ from medical_triage_agent.modeling import (
 
 
 def main() -> int:
+    """Load SFT config, support dry runs, and launch training."""
+
     args = _parse_args()
     overrides = _cli_overrides(args)
     config = load_training_config(
@@ -46,6 +48,8 @@ def run_training(
     max_train_samples: int | None = None,
     resume: str | None = None,
 ) -> None:
+    """Run QLoRA SFT with configured datasets, LoRA settings, and hub output."""
+
     from datasets import Dataset  # type: ignore[import-not-found]
     from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-not-found]
     from trl import SFTConfig, SFTTrainer  # type: ignore[import-not-found]
@@ -122,6 +126,8 @@ def run_training(
 def _load_sft_dataset(
     path: Path, *, tokenizer: Any, system_message: str | None, max_samples: int | None
 ) -> list[dict[str, Any]]:
+    """Load SFT JSONL rows and render them into trainer text rows."""
+
     rows = [
         {
             "text": sft_to_training_row(
@@ -136,6 +142,8 @@ def _load_sft_dataset(
 
 
 def _make_sft_config(config_class: Any, **kwargs: Any) -> Any:
+    """Filter SFTConfig kwargs for the installed TRL version."""
+
     supported = set(inspect.signature(config_class).parameters)
     filtered = {key: value for key, value in kwargs.items() if key in supported}
     if "eval_strategy" in kwargs and "evaluation_strategy" in supported:
@@ -144,6 +152,8 @@ def _make_sft_config(config_class: Any, **kwargs: Any) -> Any:
 
 
 def _parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for SFT training."""
+
     parser = argparse.ArgumentParser(description="Run Kaggle-friendly 4-bit QLoRA SFT")
     parser.add_argument("--config", default="configs/sft.yaml")
     parser.add_argument("--max-steps", type=int)
@@ -156,6 +166,8 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
+    """Translate CLI flags into dotted training-config overrides."""
+
     overrides: dict[str, Any] = {}
     if args.max_steps is not None:
         overrides["training.max_steps"] = args.max_steps
@@ -167,6 +179,8 @@ def _cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _dry_run_summary(config: TrainingConfig) -> dict[str, Any]:
+    """Return planned SFT training settings without loading models."""
+
     return {
         "method": config.method,
         "model": config.model_name(),

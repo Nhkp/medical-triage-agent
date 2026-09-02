@@ -24,6 +24,8 @@ ModelKind = Literal["base", "sft", "dpo"]
 
 
 def main() -> int:
+    """Run deterministic local model evaluation and write the JSON report."""
+
     args = _parse_args()
     config = load_training_config(args.config, method="sft", require_files=not args.dry_run)
     if args.dry_run:
@@ -42,6 +44,8 @@ def main() -> int:
 def evaluate_model(
     config: TrainingConfig, *, model_kind: ModelKind, adapter_path: str | None
 ) -> dict[str, Any]:
+    """Evaluate a base or adapter model against the configured SFT eval split."""
+
     from peft import PeftModel  # type: ignore[import-not-found]
     from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-not-found]
 
@@ -103,6 +107,8 @@ def evaluate_model(
 
 
 def _predict(model: Any, tokenizer: Any, example: SFTExample, system_message: str | None) -> str:
+    """Generate one deterministic completion for an SFT example."""
+
     prompt = render_prompt(
         tokenizer,
         f"{example.instruction}\n\n{example.input}".strip(),
@@ -122,6 +128,8 @@ def _predict(model: Any, tokenizer: Any, example: SFTExample, system_message: st
 
 
 def _extract_triage(response: str) -> str:
+    """Infer a triage label from free-form generated text for coarse metrics."""
+
     folded = response.casefold()
     for label in ("urgence_maximale", "moderee", "differee"):
         if label in folded:
@@ -132,6 +140,8 @@ def _extract_triage(response: str) -> str:
 
 
 def _parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for local model evaluation."""
+
     parser = argparse.ArgumentParser(description="Evaluate base/SFT/DPO models deterministically")
     parser.add_argument("--config", default="configs/sft.yaml")
     parser.add_argument("--model", choices=["base", "sft", "dpo"], default="base")
@@ -142,6 +152,8 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _dry_run_summary(config: TrainingConfig, model_kind: ModelKind) -> dict[str, Any]:
+    """Return planned evaluation inputs without loading a model."""
+
     return {
         "model_kind": model_kind,
         "model_id": config.model_name(),
@@ -152,6 +164,8 @@ def _dry_run_summary(config: TrainingConfig, model_kind: ModelKind) -> dict[str,
 
 
 def _checksum(path: Path) -> str:
+    """Compute a SHA-256 checksum for the evaluated dataset file."""
+
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
@@ -160,6 +174,8 @@ def _checksum(path: Path) -> str:
 
 
 def _git_commit() -> str | None:
+    """Return the current git commit hash when available."""
+
     try:
         return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     except (OSError, subprocess.CalledProcessError):

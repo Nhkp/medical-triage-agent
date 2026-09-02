@@ -41,6 +41,8 @@ CASES: tuple[dict[str, Any], ...] = (
 
 
 def main() -> int:
+    """Run robustness checks and write or print the JSON result."""
+
     args = _parse_args()
     result = run_robustness_eval(url=args.url)
     serialized = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
@@ -53,6 +55,8 @@ def main() -> int:
 
 
 def run_robustness_eval(*, url: str | None) -> dict[str, Any]:
+    """Exercise validation, escalation, disclaimer, and audit redaction behavior."""
+
     failures: list[str] = []
     for case in CASES:
         try:
@@ -84,12 +88,16 @@ def run_robustness_eval(*, url: str | None) -> dict[str, Any]:
 
 
 def _call_triage(url: str | None, payload: dict[str, Any]) -> dict[str, Any]:
+    """Call triage in-process or through the remote API."""
+
     if not url:
         return api.triage(payload)
     return _post_json(f"{url.rstrip('/')}/triage", payload)
 
 
 def _call_audit(url: str | None, audit_id: str) -> dict[str, Any] | None:
+    """Fetch audit metadata in-process or through the remote API."""
+
     if not url:
         return api.audit(audit_id)
     with urlopen(f"{url.rstrip('/')}/audit/{audit_id}", timeout=30) as response:
@@ -97,6 +105,8 @@ def _call_audit(url: str | None, audit_id: str) -> dict[str, Any] | None:
 
 
 def _post_json(url: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """POST JSON and convert 4xx API responses into validation errors."""
+
     request = Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -113,6 +123,8 @@ def _post_json(url: str, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for robustness evaluation."""
+
     parser = argparse.ArgumentParser(description="Run CHSA triage API robustness checks")
     parser.add_argument("--url", help="FastAPI base URL; omit for in-process fallback")
     parser.add_argument("--output", default="outputs/evaluations/robustness.json")

@@ -17,6 +17,8 @@ def sft_to_training_row(
     tokenizer: Any | None = None,
     system_message: str | None = None,
 ) -> dict[str, Any]:
+    """Convert an SFTExample into the chat-rendered row expected by SFT trainers."""
+
     prompt = build_user_prompt(example.instruction, example.input)
     response = example.output
     row = {
@@ -38,6 +40,8 @@ def dpo_to_training_row(
     tokenizer: Any | None = None,
     system_message: str | None = None,
 ) -> dict[str, Any]:
+    """Convert a DPOExample into TRL preference messages."""
+
     # Let TRL own chat-template rendering for preference rows; pre-rendered prompt strings can
     # make Qwen tokenization disagree when TRL later slices prompt+chosen/rejected.
     prompt = chat_prompt_messages(example.prompt, system_message=system_message)
@@ -53,6 +57,8 @@ def dpo_to_training_row(
 
 
 def build_user_prompt(instruction: str, input_text: str) -> str:
+    """Join instruction and optional input text into one user prompt."""
+
     return (
         f"{instruction.strip()}\n\n{input_text.strip()}"
         if input_text.strip()
@@ -66,6 +72,8 @@ def render_prompt(
     *,
     system_message: str | None = None,
 ) -> str:
+    """Render a generation prompt with a tokenizer chat template when available."""
+
     messages = [
         {"role": "system", "content": system_message or DEFAULT_SYSTEM_MESSAGE},
         {"role": "user", "content": prompt},
@@ -86,6 +94,8 @@ def chat_prompt_messages(
     *,
     system_message: str | None = None,
 ) -> list[dict[str, str]]:
+    """Build system/user messages for a prompt-only chat turn."""
+
     return [
         {"role": "system", "content": system_message or DEFAULT_SYSTEM_MESSAGE},
         {"role": "user", "content": prompt},
@@ -99,6 +109,8 @@ def render_chat(
     *,
     system_message: str | None = None,
 ) -> str:
+    """Render a complete system/user/assistant training conversation."""
+
     messages = [
         {"role": "system", "content": system_message or DEFAULT_SYSTEM_MESSAGE},
         {"role": "user", "content": prompt},

@@ -15,6 +15,8 @@ UNSAFE_PHRASES = (
 
 @dataclass(frozen=True)
 class SafetyCase:
+    """Rule-based triage scenario used by the lightweight safety gate."""
+
     name: str
     symptoms: tuple[str, ...]
     expected_priority: str
@@ -29,6 +31,8 @@ SAFETY_CASES = (
 
 
 def run_safety_evaluation() -> dict[str, object]:
+    """Run deterministic safety checks for escalation, disclaimer, and unsafe wording."""
+
     failures: list[str] = []
     for case in SAFETY_CASES:
         response = assess_triage({"symptoms": list(case.symptoms)})

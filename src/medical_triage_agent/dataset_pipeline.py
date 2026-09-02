@@ -25,6 +25,8 @@ SPLITS = ("train", "validation", "test", "clinical_eval")
 
 @dataclass(frozen=True)
 class GeneratedDataset:
+    """Paths produced by a split-writing dataset operation."""
+
     manifest_path: Path
     split_paths: tuple[Path, ...]
     card_path: Path | None = None
@@ -32,6 +34,8 @@ class GeneratedDataset:
 
 @dataclass(frozen=True)
 class TrainingDataConfig:
+    """Targets and output path for the unified local training dataset build."""
+
     output_dir: Path
     sft_target: int = 5000
     dpo_target: int = 1000
@@ -41,17 +45,23 @@ class TrainingDataConfig:
 
 @dataclass(frozen=True)
 class SourceLoadResult[RecordT: (SFTExample, DPOExample)]:
+    """Accepted records plus the number rejected during source mapping."""
+
     records: list[RecordT]
     rejected: int = 0
 
 
 def load_hf_sft_records(source_id: str, limit: int | None = None) -> list[SFTExample]:
+    """Load accepted SFT records from a registered Hugging Face source."""
+
     return list(_load_hf_sft_records_with_rejections(source_id, limit).records)
 
 
 def _load_hf_sft_records_with_rejections(
     source_id: str, limit: int | None = None
 ) -> SourceLoadResult[SFTExample]:
+    """Load SFT records while preserving rejected-row counts for audit reports."""
+
     registry = load_source_registry()
     source = validate_source_for_use(source_id, "sft", registry)
 
@@ -68,6 +78,8 @@ def _load_hf_sft_records_with_rejections(
 
 
 def map_frenchmedmcqa(row: dict[str, Any], source: SourceRecord) -> SFTExample:
+    """Map one FrenchMedMCQA row into the project SFT contract."""
+
     question = _string(row, "question")
     options = _options(row)
     correct_index = _int(row, "correct_answers")
@@ -102,6 +114,8 @@ def map_frenchmedmcqa(row: dict[str, Any], source: SourceRecord) -> SFTExample:
 
 
 def map_medquad(row: dict[str, Any], source: SourceRecord) -> SFTExample:
+    """Map one MedQuad QA row into the project SFT contract."""
+
     question = _string(row, "Question")
     answer = _string(row, "Answer")
     qtype = str(row.get("qtype", "unknown"))
@@ -133,12 +147,16 @@ def map_medquad(row: dict[str, Any], source: SourceRecord) -> SFTExample:
 
 
 def load_hf_dpo_records(source_id: str, limit: int | None = None) -> list[DPOExample]:
+    """Load accepted DPO records from a registered Hugging Face source."""
+
     return list(_load_hf_dpo_records_with_rejections(source_id, limit).records)
 
 
 def _load_hf_dpo_records_with_rejections(
     source_id: str, limit: int | None = None
 ) -> SourceLoadResult[DPOExample]:
+    """Load DPO records while preserving rejected-row counts for audit reports."""
+
     registry = load_source_registry()
     source = validate_source_for_use(source_id, "dpo", registry)
     if source_id != "ultramedical_preference":
@@ -149,6 +167,8 @@ def _load_hf_dpo_records_with_rejections(
 
 
 def map_mediqa_oeq(row: dict[str, Any], source: SourceRecord) -> SFTExample:
+    """Map one MediQAl open-ended QA row into the project SFT contract."""
+
     clinical_case = _string(row, "clinical_case")
     question = _string(row, "question")
     answer = _string(row, "answer")
@@ -175,6 +195,8 @@ def map_mediqa_oeq(row: dict[str, Any], source: SourceRecord) -> SFTExample:
 
 
 def map_ultramedical_preference(row: dict[str, Any], source: SourceRecord) -> DPOExample:
+    """Map one UltraMedical preference row into the project DPO contract."""
+
     prompt = _string(row, "prompt")
     chosen = _last_assistant_content(row.get("chosen"))
     rejected = _last_assistant_content(row.get("rejected"))
@@ -210,6 +232,8 @@ def write_splits(
     output_dir: Path,
     kind: DatasetKind,
 ) -> GeneratedDataset:
+    """Write deterministic split files and a manifest for one dataset kind."""
+
     output_dir.mkdir(parents=True, exist_ok=True)
     split_rows: dict[str, list[dict[str, Any]]] = {split: [] for split in SPLITS}
     for record in records:
@@ -235,6 +259,8 @@ def write_splits(
 
 
 def build_training_data(config: TrainingDataConfig) -> dict[str, Any]:
+    """Build unified SFT/DPO training artifacts with audit and review sidecars."""
+
     config.output_dir.mkdir(parents=True, exist_ok=True)
     # Build SFT and DPO together so the manifest describes one coherent training snapshot.
     sft_records, rejected_counts = _build_sft_records(config)
@@ -277,6 +303,8 @@ def build_training_data(config: TrainingDataConfig) -> dict[str, Any]:
 
 
 def audit_training_data(output_dir: Path) -> dict[str, Any]:
+    """Audit a generated training-data directory without rebuilding sources."""
+
     sft_rows = _read_kind_splits(output_dir, "sft")
     dpo_rows = _read_kind_splits(output_dir, "dpo")
     manifest_path = output_dir / "manifest.json"
@@ -299,6 +327,8 @@ def audit_training_data(output_dir: Path) -> dict[str, Any]:
 
 
 def summarize_training_data(output_dir: Path) -> dict[str, Any]:
+    """Return the manifest fields used by CLI and notebook summaries."""
+
     manifest_path = output_dir / "manifest.json"
     if not manifest_path.exists():
         raise FileNotFoundError(f"missing manifest: {manifest_path}")
@@ -317,6 +347,8 @@ def summarize_training_data(output_dir: Path) -> dict[str, Any]:
 def build_manifest(
     kind: DatasetKind, split_rows: dict[str, list[dict[str, Any]]]
 ) -> dict[str, Any]:
+    """Build a manifest for split files belonging to one dataset kind."""
+
     all_rows = [row for rows in split_rows.values() for row in rows]
     return {
         "kind": kind,
@@ -341,6 +373,8 @@ def build_training_manifest(
     split_paths: tuple[Path, ...],
     rejected_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
+    """Build the release manifest for the unified SFT/DPO training snapshot."""
+
     all_rows = _all_rows(sft_rows, dpo_rows)
     # The manifest is intentionally redundant: it should be enough to audit a dataset folder
     # without replaying the whole ingestion job.
@@ -380,6 +414,8 @@ def build_audit_report(
     *,
     rejected_counts: dict[str, int] | None = None,
 ) -> dict[str, Any]:
+    """Build audit metrics and failure details for generated training rows."""
+
     errors: list[str] = []
     # Reuse row-level audits here; this wrapper adds cross-split and artifact-level signals.
     sft_errors = _audit_kind_rows(sft_rows, "sft")
@@ -420,6 +456,8 @@ def build_clinical_review_queue(
     sft_rows: dict[str, list[dict[str, Any]]],
     dpo_rows: dict[str, list[dict[str, Any]]],
 ) -> list[dict[str, Any]]:
+    """Collect records that need clinician review before clinical use."""
+
     rows: list[dict[str, Any]] = []
     for kind, split_rows in (("sft", sft_rows), ("dpo", dpo_rows)):
         for split, records in split_rows.items():
@@ -444,6 +482,8 @@ def build_clinical_review_queue(
 
 
 def make_dataset_card(manifest_path: Path, output_path: Path) -> Path:
+    """Render a minimal dataset README from a generated manifest."""
+
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     lines = [
         "# CHSA medical triage POC dataset",
@@ -482,6 +522,8 @@ def make_dataset_card(manifest_path: Path, output_path: Path) -> Path:
 
 
 def _build_sft_records(config: TrainingDataConfig) -> tuple[list[SFTExample], dict[str, int]]:
+    """Load SFT sources in the configured priority order and return reject counts."""
+
     mediqa_target = min(config.sft_mediqa, config.sft_target)
     french_target = min(config.sft_frenchmedmcqa, max(0, config.sft_target - mediqa_target))
     mediqa = _load_hf_sft_records_with_rejections("mediqa", mediqa_target)
@@ -501,6 +543,8 @@ def _build_sft_records(config: TrainingDataConfig) -> tuple[list[SFTExample], di
 
 
 def _split_examples(records: Iterable[SFTExample | DPOExample]) -> dict[str, list[dict[str, Any]]]:
+    """Group normalized records by deterministic split name."""
+
     split_rows: dict[str, list[dict[str, Any]]] = {split: [] for split in SPLITS}
     for record in records:
         split_rows[assign_split(record.id)].append(record.to_dict())
@@ -510,6 +554,8 @@ def _split_examples(records: Iterable[SFTExample | DPOExample]) -> dict[str, lis
 def _write_kind_splits(
     output_dir: Path, kind: DatasetKind, split_rows: dict[str, list[dict[str, Any]]]
 ) -> tuple[Path, ...]:
+    """Write all split files for one dataset kind and return their paths."""
+
     paths: list[Path] = []
     for split in SPLITS:
         path = output_dir / f"{kind}_{split}.jsonl"
@@ -519,6 +565,8 @@ def _write_kind_splits(
 
 
 def _read_kind_splits(output_dir: Path, kind: DatasetKind) -> dict[str, list[dict[str, Any]]]:
+    """Read every expected split file for one dataset kind."""
+
     from medical_triage_agent.contracts import load_jsonl
 
     # Read every split explicitly so a missing file fails the audit instead of being ignored.
@@ -526,6 +574,8 @@ def _read_kind_splits(output_dir: Path, kind: DatasetKind) -> dict[str, list[dic
 
 
 def _audit_kind_rows(split_rows: dict[str, list[dict[str, Any]]], kind: DatasetKind) -> list[str]:
+    """Run row-level audits across splits and prefix errors with split names."""
+
     errors: list[str] = []
     for split, rows in split_rows.items():
         result = audit_records(rows, kind)
@@ -536,6 +586,8 @@ def _audit_kind_rows(split_rows: dict[str, list[dict[str, Any]]], kind: DatasetK
 def _split_overlap_errors(
     split_rows: dict[str, list[dict[str, Any]]], kind: DatasetKind
 ) -> list[str]:
+    """Return duplicate-ID errors across splits for one dataset kind."""
+
     owners: dict[str, str] = {}
     errors: list[str] = []
     for split, rows in split_rows.items():
@@ -550,10 +602,14 @@ def _split_overlap_errors(
 
 
 def _all_rows(*split_groups: dict[str, list[dict[str, Any]]]) -> list[dict[str, Any]]:
+    """Flatten one or more split dictionaries into row order."""
+
     return [row for group in split_groups for rows in group.values() for row in rows]
 
 
 def _count_by(rows: Iterable[dict[str, Any]], key: str) -> dict[str, int]:
+    """Count rows by a scalar field, using unknown for missing values."""
+
     counts: dict[str, int] = {}
     for row in rows:
         value = str(row.get(key, "unknown"))
@@ -562,6 +618,8 @@ def _count_by(rows: Iterable[dict[str, Any]], key: str) -> dict[str, int]:
 
 
 def _source_counts(rows: Iterable[dict[str, Any]]) -> dict[str, int]:
+    """Count provenance source IDs across rows."""
+
     counts: dict[str, int] = {}
     for row in rows:
         for source_id in row["source_ids"]:
@@ -570,6 +628,8 @@ def _source_counts(rows: Iterable[dict[str, Any]]) -> dict[str, int]:
 
 
 def _needs_review(transforms: Any) -> bool:
+    """Return whether transform history implies clinical review debt."""
+
     if not isinstance(transforms, list):
         return True
     review_transforms = ("map_mediqa_oeq", "map_frenchmedmcqa", "map_medquad")
@@ -577,12 +637,16 @@ def _needs_review(transforms: Any) -> bool:
 
 
 def _manifest_sources(manifest: dict[str, Any]) -> list[str]:
+    """Read source IDs from old or unified manifest shapes."""
+
     if "source_ids" in manifest:
         return list(manifest["source_ids"])
     return list(manifest.get("source_counts", {}).keys())
 
 
 def _split_count_lines(manifest: dict[str, Any]) -> list[str]:
+    """Render markdown rows for either simple or unified split counts."""
+
     split_counts = manifest["split_counts"]
     if "sft" in split_counts or "dpo" in split_counts:
         lines: list[str] = []
@@ -597,6 +661,8 @@ def _map_rows[RecordT: (SFTExample, DPOExample)](
     limit: int | None,
     mapper: Callable[[dict[str, Any]], RecordT],
 ) -> SourceLoadResult[RecordT]:
+    """Map source rows, dropping invalid, duplicate, or PII-containing records."""
+
     records: list[RecordT] = []
     rejected = 0
     seen_ids: set[str] = set()
@@ -621,10 +687,14 @@ def _map_rows[RecordT: (SFTExample, DPOExample)](
 
 
 def _contains_pii(record: dict[str, Any]) -> bool:
+    """Return whether any nested string in a record matches PII detectors."""
+
     return any(find_pii(value) for value in _record_strings(record))
 
 
 def _record_strings(value: Any) -> Iterable[str]:
+    """Yield every string nested inside a JSON-like record."""
+
     if isinstance(value, str):
         yield value
     elif isinstance(value, dict):
@@ -636,6 +706,8 @@ def _record_strings(value: Any) -> Iterable[str]:
 
 
 def _load_hf_dataset(*args: Any, **kwargs: Any) -> Iterable[dict[str, Any]]:
+    """Load an iterable Hugging Face dataset behind the optional training extra."""
+
     # Keep HF tooling out of the default install; data builds opt into the heavier stack.
     try:
         datasets = importlib.import_module("datasets")
@@ -648,12 +720,16 @@ def _load_hf_dataset(*args: Any, **kwargs: Any) -> Iterable[dict[str, Any]]:
 
 
 def _write_jsonl(path: Path, rows: list[dict[str, Any]]) -> None:
+    """Write rows as UTF-8 JSONL with stable key ordering."""
+
     with path.open("w", encoding="utf-8") as handle:
         for row in rows:
             handle.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
 
 
 def _rows_hash(rows: list[dict[str, Any]]) -> str:
+    """Hash ordered JSONL row content for manifest reproducibility checks."""
+
     digest = hashlib.sha256()
     for row in rows:
         digest.update(json.dumps(row, ensure_ascii=False, sort_keys=True).encode("utf-8"))
@@ -662,6 +738,8 @@ def _rows_hash(rows: list[dict[str, Any]]) -> str:
 
 
 def _string(row: dict[str, Any], key: str) -> str:
+    """Read a non-empty string field from a raw source row."""
+
     value = row.get(key)
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"{key} must be a non-empty string")
@@ -669,6 +747,8 @@ def _string(row: dict[str, Any], key: str) -> str:
 
 
 def _int(row: dict[str, Any], key: str) -> int:
+    """Read an integer field from a raw source row."""
+
     value = row.get(key)
     if not isinstance(value, int):
         raise TypeError(f"{key} must be an integer")
@@ -676,10 +756,14 @@ def _int(row: dict[str, Any], key: str) -> int:
 
 
 def _options(row: dict[str, Any]) -> list[str]:
+    """Return the five FrenchMedMCQA answer option strings."""
+
     return [_string(row, f"answer_{label}") for label in ("a", "b", "c", "d", "e")]
 
 
 def _last_assistant_content(messages: Any) -> str:
+    """Extract the last assistant message content from chat-style preference data."""
+
     if not isinstance(messages, list):
         raise TypeError("messages must be a list")
     for message in reversed(messages):
@@ -694,6 +778,8 @@ def _last_assistant_content(messages: Any) -> str:
 def _coerce_record(
     record: SFTExample | DPOExample | dict[str, Any], kind: DatasetKind
 ) -> SFTExample | DPOExample:
+    """Accept existing example objects or parse dictionaries for the requested kind."""
+
     if isinstance(record, SFTExample | DPOExample):
         return record
     return SFTExample.from_mapping(record) if kind == "sft" else DPOExample.from_mapping(record)

@@ -30,6 +30,8 @@ DEFAULT_MODELS = {
 
 @dataclass(frozen=True)
 class CalibrationCase:
+    """One served-model calibration case with expected triage behavior."""
+
     id: str
     language: str
     symptoms: list[str]
@@ -39,6 +41,8 @@ class CalibrationCase:
 
 
 def main() -> int:
+    """Compare configured served models against the calibration fixture."""
+
     args = _parse_args()
     model_names = _model_names(args.models)
     cases = load_cases(Path(args.dataset))
@@ -70,6 +74,8 @@ def main() -> int:
 
 
 def load_cases(path: Path) -> list[CalibrationCase]:
+    """Load JSONL calibration cases from disk."""
+
     rows = []
     with path.open(encoding="utf-8") as handle:
         for line in handle:
@@ -81,6 +87,8 @@ def load_cases(path: Path) -> list[CalibrationCase]:
 
 
 def validate_case(raw: dict[str, Any]) -> CalibrationCase:
+    """Validate and normalize one calibration fixture row."""
+
     required = ("id", "language", "symptoms", "expected_priority", "red_flag", "notes")
     missing = [key for key in required if key not in raw]
     if missing:
@@ -111,6 +119,8 @@ def evaluate_api_model(
     dataset_path: Path,
     model_metadata: dict[str, str | None],
 ) -> dict[str, Any]:
+    """Evaluate one served model through the triage and audit APIs."""
+
     predictions = []
     for case in cases:
         started = time.perf_counter()
@@ -133,6 +143,8 @@ def evaluate_api_model(
 
 
 def comparison_metrics(rows: list[dict[str, Any]]) -> dict[str, float]:
+    """Compute safety and formatting metrics from served-model predictions."""
+
     benign = [row for row in rows if not row["red_flag"]]
     red_flags = [row for row in rows if row["red_flag"]]
     latencies = [float(row["latency_ms"]) for row in rows]
@@ -160,6 +172,8 @@ def comparison_metrics(rows: list[dict[str, Any]]) -> dict[str, float]:
 
 
 def write_summary_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    """Write model comparison summary rows as CSV."""
+
     if not rows:
         path.write_text("", encoding="utf-8")
         return
@@ -172,6 +186,8 @@ def write_summary_csv(path: Path, rows: list[dict[str, Any]]) -> None:
 def _prediction_row(
     case: CalibrationCase, response: dict[str, Any], audit: dict[str, Any], latency_ms: float
 ) -> dict[str, Any]:
+    """Combine fixture, response, audit, and latency data into one report row."""
+
     preview = audit.get("llm_response_preview") or ""
     return {
         "id": case.id,
@@ -193,6 +209,8 @@ def _prediction_row(
 
 
 def _post_json(url: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """POST JSON and parse the JSON response."""
+
     request = Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
@@ -204,11 +222,15 @@ def _post_json(url: str, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _get_json(url: str) -> dict[str, Any]:
+    """GET JSON and parse the JSON response."""
+
     with urlopen(url, timeout=120) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
 def _has_repeated_text(text: str) -> bool:
+    """Detect repeated sentences or repeated two-sentence blocks in previews."""
+
     sentences = [
         re.sub(r"\s+", " ", match.group(0).strip().casefold())
         for match in re.finditer(r"[^.!?]+[.!?]+|[^.!?]+$", text)
@@ -226,11 +248,15 @@ def _has_repeated_text(text: str) -> bool:
 
 
 def _ratio(values: Any) -> float:
+    """Return the fraction of truthy values, or 0.0 for empty inputs."""
+
     items = list(values)
     return sum(bool(item) for item in items) / len(items) if items else 0.0
 
 
 def _percentile(values: list[float], percentile: float) -> float:
+    """Return a nearest-rank percentile from sorted float values."""
+
     if not values:
         return 0.0
     ordered = sorted(values)
@@ -239,6 +265,8 @@ def _percentile(values: list[float], percentile: float) -> float:
 
 
 def _model_names(raw: str) -> list[str]:
+    """Parse and validate comma-separated model aliases."""
+
     names = [name.strip() for name in raw.split(",") if name.strip()]
     unknown = [name for name in names if name not in DEFAULT_MODELS]
     if unknown:
@@ -249,6 +277,8 @@ def _model_names(raw: str) -> list[str]:
 def _dry_run_summary(
     args: argparse.Namespace, model_names: list[str], cases: list[CalibrationCase]
 ) -> dict[str, Any]:
+    """Return planned comparison inputs and output paths without API calls."""
+
     return {
         "url": args.url,
         "dataset": args.dataset,
@@ -263,6 +293,8 @@ def _dry_run_summary(
 
 
 def _git_commit() -> str | None:
+    """Return the current git commit hash when available."""
+
     try:
         return subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
     except (OSError, subprocess.CalledProcessError):
@@ -270,6 +302,8 @@ def _git_commit() -> str | None:
 
 
 def _parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for served-model comparison."""
+
     parser = argparse.ArgumentParser(description="Compare served base/SFT/DPO triage behavior")
     parser.add_argument("--url", default="http://127.0.0.1:8080", help="FastAPI base URL")
     parser.add_argument("--dataset", default=str(DEFAULT_DATASET))

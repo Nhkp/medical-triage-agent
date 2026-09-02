@@ -19,6 +19,8 @@ def normalize_sft_record(
     source_id: str,
     metadata: Metadata,
 ) -> SFTExample:
+    """Redact and canonicalize raw supervised data into an SFTExample."""
+
     payload: dict[str, Any] = {
         "language": language,
         "instruction": redact_pii(instruction),
@@ -39,6 +41,8 @@ def normalize_dpo_record(
     source_id: str,
     metadata: Metadata,
 ) -> DPOExample:
+    """Redact and canonicalize raw preference data into a DPOExample."""
+
     payload: dict[str, Any] = {
         "language": language,
         "prompt": redact_pii(prompt),
@@ -51,6 +55,8 @@ def normalize_dpo_record(
 
 
 def assign_split(record_id: str) -> SplitName:
+    """Assign a stable train/validation/test/clinical split from the record ID."""
+
     bucket = int(hashlib.sha256(record_id.encode("utf-8")).hexdigest()[:8], 16) % 100
     if bucket < 80:
         return "train"
@@ -62,4 +68,6 @@ def assign_split(record_id: str) -> SplitName:
 
 
 def to_jsonl_line(record: SFTExample | DPOExample) -> str:
+    """Serialize one normalized record as a deterministic JSONL line."""
+
     return json.dumps(record.to_dict(), ensure_ascii=False, sort_keys=True) + "\n"

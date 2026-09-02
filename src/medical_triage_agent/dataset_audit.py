@@ -17,11 +17,15 @@ DatasetKind = Literal["sft", "dpo"]
 
 @dataclass(frozen=True)
 class AuditResult:
+    """Summary of dataset audit coverage and validation failures."""
+
     checked: int
     errors: tuple[str, ...]
 
     @property
     def ok(self) -> bool:
+        """Return whether the audit completed without errors."""
+
         return not self.errors
 
 
@@ -30,6 +34,8 @@ def audit_records(
     kind: DatasetKind,
     registry: dict[str, SourceRecord] | None = None,
 ) -> AuditResult:
+    """Validate dataset rows for schema, provenance, PII, and duplicates."""
+
     source_registry = registry if registry is not None else load_source_registry()
     errors: list[str] = []
     seen_ids: set[str] = set()
@@ -60,10 +66,14 @@ def audit_records(
 
 
 def audit_jsonl(path: str, kind: DatasetKind) -> AuditResult:
+    """Load and audit a JSONL dataset file."""
+
     return audit_records(load_jsonl(path), kind)
 
 
 def assert_split_isolation(split_records: Mapping[str, Iterable[dict[str, Any]]]) -> None:
+    """Ensure each record ID belongs to exactly one split."""
+
     owners: dict[str, str] = {}
     for split_name, records in split_records.items():
         for record in records:
@@ -78,11 +88,15 @@ def assert_split_isolation(split_records: Mapping[str, Iterable[dict[str, Any]]]
 
 
 def _assert_record_has_no_pii(record: dict[str, Any]) -> None:
+    """Reject a record when any nested string matches PII detectors."""
+
     for value in _strings(record):
         assert_no_pii(value)
 
 
 def _strings(value: Any) -> Iterable[str]:
+    """Yield every string contained in a JSON-like value."""
+
     if isinstance(value, str):
         yield value
     elif isinstance(value, dict):

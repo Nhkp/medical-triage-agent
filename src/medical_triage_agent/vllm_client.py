@@ -77,6 +77,8 @@ _OPTIONAL_CONTEXT_KEYS = (
 
 @dataclass(frozen=True)
 class TriageGenerationResult:
+    """Normalized remote-generation result plus audit-safe preview metadata."""
+
     explanation: str | None
     llm_status: str
     suggested_priority: str | None = None
@@ -86,6 +88,8 @@ class TriageGenerationResult:
 
     @property
     def explanation_source(self) -> str:
+        """Return whether the explanation may be shown as LLM-authored."""
+
         return "llm" if self.llm_status in {"accepted", "accepted_repaired"} else "fallback"
 
 
@@ -93,14 +97,20 @@ ExplanationResult = TriageGenerationResult
 
 
 def configured_model() -> str:
+    """Return the configured vLLM model ID or the rule-only fallback label."""
+
     return os.environ.get("VLLM_MODEL_ID", "rule_based_v1")
 
 
 def is_configured() -> bool:
+    """Return whether a vLLM base URL is available."""
+
     return bool(os.environ.get("VLLM_BASE_URL"))
 
 
 def generate_triage(payload: dict[str, Any], response: TriageResponse) -> TriageGenerationResult:
+    """Call vLLM for a triage suggestion and normalize connection/output failures."""
+
     base_url = os.environ.get("VLLM_BASE_URL")
     if not base_url:
         return TriageGenerationResult(explanation=None, llm_status="not_configured")
@@ -132,6 +142,8 @@ def generate_triage(payload: dict[str, Any], response: TriageResponse) -> Triage
 
 
 def generate_explanation(payload: dict[str, Any], response: TriageResponse) -> ExplanationResult:
+    """Backward-compatible alias for triage generation."""
+
     return generate_triage(payload, response)
 
 
@@ -141,6 +153,8 @@ def build_chat_request(
     *,
     structured_output: Literal["structured_outputs", "guided_json"] = "structured_outputs",
 ) -> dict[str, Any]:
+    """Build a chat-completions payload with the CHSA safety output contract."""
+
     request: dict[str, Any] = {
         "model": configured_model(),
         "messages": [
@@ -167,6 +181,8 @@ def build_chat_request(
 
 
 def _chat_request(base_url: str, payload: dict[str, Any]) -> Request:
+    """Create the HTTP request for vLLM's OpenAI-compatible chat endpoint."""
+
     data = json.dumps(payload).encode("utf-8")
     return Request(
         f"{base_url.rstrip('/')}/chat/completions",
@@ -177,12 +193,16 @@ def _chat_request(base_url: str, payload: dict[str, Any]) -> Request:
 
 
 def _should_retry_with_legacy_guided_json(exc: HTTPError) -> bool:
+    """Return whether vLLM may be using the older guided_json parameter."""
+
     return exc.code in {400, 404, 422}
 
 
 def _generate_triage_with_legacy_guided_json(
     base_url: str, payload: dict[str, Any], response: TriageResponse
 ) -> TriageGenerationResult:
+    """Retry generation using vLLM's legacy structured-output parameter."""
+
     request_payload = build_chat_request(payload, response, structured_output="guided_json")
     try:
         with urlopen(_chat_request(base_url, request_payload), timeout=_request_timeout()) as raw:
@@ -204,6 +224,8 @@ def _generate_triage_with_legacy_guided_json(
 
 
 def _model_context(payload: dict[str, Any], response: TriageResponse) -> dict[str, Any]:
+    """Limit model-visible context to symptoms, rule priority, and safe optional fields."""
+
     context: dict[str, Any] = {
         "symptoms": payload.get("symptoms", []),
         "rule_priority": response.priority,
@@ -215,6 +237,8 @@ def _model_context(payload: dict[str, Any], response: TriageResponse) -> dict[st
 
 
 def _headers() -> dict[str, str]:
+    """Build JSON headers and optional bearer auth for vLLM."""
+
     headers = {"Content-Type": "application/json"}
     api_key = os.environ.get("API_KEY")
     if api_key:
@@ -223,6 +247,8 @@ def _headers() -> dict[str, str]:
 
 
 def _request_timeout() -> float | None:
+    """Read the optional vLLM timeout, treating blank/0/none as no timeout."""
+
     configured = os.environ.get("VLLM_TIMEOUT_SECONDS")
     if configured is None or configured.strip().casefold() in {"", "0", "none"}:
         return None
@@ -230,10 +256,14 @@ def _request_timeout() -> float | None:
 
 
 def extract_explanation(payload: dict[str, Any]) -> ExplanationResult:
+    """Backward-compatible alias for structured triage extraction."""
+
     return extract_triage_generation(payload)
 
 
 def extract_triage_generation(payload: dict[str, Any]) -> TriageGenerationResult:
+    """Extract, validate, and possibly repair the model's structured triage output."""
+
     content = _raw_content(payload)
     if content is None:
         preview, truncated = _safe_preview(json.dumps(payload, ensure_ascii=False, sort_keys=True))
@@ -272,6 +302,8 @@ def extract_triage_generation(payload: dict[str, Any]) -> TriageGenerationResult
 def _repair_non_json_generation(
     content: str, preview: str, truncated: bool
 ) -> TriageGenerationResult:
+    """Attempt conservative repair of common non-JSON model responses."""
+
     object_result = _repair_object_like_generation(content, preview, truncated)
     if object_result is not None:
         return object_result
@@ -304,6 +336,8 @@ def _repair_non_json_generation(
 
 
 def _first_response_block(content: str) -> str:
+    """Trim leaked chat-turn markers from a generated response."""
+
     parts = re.split(
         r"具有战士|^\s*(?:user|assistant)\s*$",
         content,
@@ -316,6 +350,8 @@ def _first_response_block(content: str) -> str:
 def _repair_object_like_generation(
     content: str, preview: str, truncated: bool
 ) -> TriageGenerationResult | None:
+    """Repair object-like outputs that are close to the required JSON schema."""
+
     candidate = _first_braced_object(content)
     if candidate is None:
         return None
@@ -368,6 +404,8 @@ def _repair_object_like_generation(
 
 
 def _first_braced_object(content: str) -> str | None:
+    """Return the first balanced JSON-like object while respecting quoted braces."""
+
     start = content.find("{")
     if start < 0:
         return None
@@ -396,6 +434,8 @@ def _first_braced_object(content: str) -> str | None:
 
 
 def _quote_unquoted_object_keys(candidate: str) -> str:
+    """Quote simple bare object keys before a JSON parse attempt."""
+
     return re.sub(r"([,{]\s*)([A-Za-z_][A-Za-z0-9_]*)\s*:", r'\1"\2":', candidate)
 
 
@@ -408,6 +448,8 @@ def _accepted_or_invalid_result(
     truncated: bool,
     repaired: bool,
 ) -> TriageGenerationResult:
+    """Accept only safe schema-valid generations, preserving previews for audit."""
+
     if suggested_priority not in TRIAGE_ORDER or not isinstance(explanation, str):
         return TriageGenerationResult(
             explanation=None,
@@ -441,11 +483,15 @@ def _accepted_or_invalid_result(
 
 
 def _extract_content(payload: dict[str, Any]) -> str | None:
+    """Compatibility helper returning only accepted explanation text."""
+
     result = extract_explanation(payload)
     return result.explanation
 
 
 def _raw_content(payload: dict[str, Any]) -> str | None:
+    """Read choices[0].message.content from an OpenAI-compatible response."""
+
     choices = payload.get("choices")
     if not isinstance(choices, list) or not choices:
         return None
@@ -462,6 +508,8 @@ def _raw_content(payload: dict[str, Any]) -> str | None:
 
 
 def _strip_code_fence(content: str) -> str:
+    """Remove a surrounding markdown code fence from model output."""
+
     stripped = content.strip()
     if not stripped.startswith("```"):
         return stripped
@@ -472,6 +520,8 @@ def _strip_code_fence(content: str) -> str:
 
 
 def _safe_preview(content: str, limit: int = 1200) -> tuple[str, bool]:
+    """Return a redacted bounded preview for audits and UI diagnostics."""
+
     redacted = redact_pii(content).strip()
     if len(redacted) <= limit:
         return redacted, False
@@ -479,6 +529,8 @@ def _safe_preview(content: str, limit: int = 1200) -> tuple[str, bool]:
 
 
 def _valid_explanation(explanation: str) -> bool:
+    """Enforce explanation safety constraints before using model text."""
+
     if not 20 <= len(explanation) <= 800:
         return False
     if len(_sentences(explanation)) < 2:
@@ -495,6 +547,8 @@ def _valid_explanation(explanation: str) -> bool:
 
 
 def _has_repeated_sentence(explanation: str) -> bool:
+    """Return whether an explanation repeats a normalized sentence."""
+
     seen: set[str] = set()
     for sentence in _sentences(explanation):
         normalized = _normalized_sentence(sentence)
@@ -507,6 +561,8 @@ def _has_repeated_sentence(explanation: str) -> bool:
 
 
 def _deduplicate_repeated_sentences(explanation: str) -> tuple[str, bool]:
+    """Remove repeated sentences or repeated sentence blocks from otherwise valid text."""
+
     sentences = _sentences(explanation)
     if not sentences:
         return explanation, False
@@ -530,6 +586,8 @@ def _deduplicate_repeated_sentences(explanation: str) -> tuple[str, bool]:
 
 
 def _deduplicate_repeated_sentence_blocks(sentences: list[str]) -> tuple[list[str], bool]:
+    """Collapse consecutive repeated sentence blocks while preserving the first block."""
+
     normalized = [_normalized_sentence(sentence) for sentence in sentences]
     kept: list[str] = []
     changed = False
@@ -549,6 +607,8 @@ def _deduplicate_repeated_sentence_blocks(sentences: list[str]) -> tuple[list[st
 
 
 def _repeated_block_size(normalized: list[str], index: int) -> int | None:
+    """Return the size of the repeated block starting at index, if any."""
+
     remaining = len(normalized) - index
     for block_size in range(1, remaining // 2 + 1):
         block = normalized[index : index + block_size]
@@ -561,6 +621,8 @@ def _repeated_block_size(normalized: list[str], index: int) -> int | None:
 
 
 def _sentences(explanation: str) -> list[str]:
+    """Split explanation text into sentence-like units for validation."""
+
     return [
         match.group(0).strip()
         for match in re.finditer(r"[^.!?]+[.!?]+|[^.!?]+$", explanation)
@@ -569,11 +631,15 @@ def _sentences(explanation: str) -> list[str]:
 
 
 def _normalized_sentence(sentence: str) -> str:
+    """Normalize a sentence for duplicate detection, ignoring very short fragments."""
+
     stripped = re.sub(r"\s+", " ", sentence.strip().casefold())
     return stripped if len(stripped) >= 12 else ""
 
 
 def _contains_forbidden_advice(explanation: str) -> bool:
+    """Detect diagnosis, treatment, dosage, or unsafe reassurance language."""
+
     lowered = explanation.casefold()
     forbidden_fragments = (
         "diagnosis is",
@@ -603,6 +669,8 @@ def _contains_forbidden_advice(explanation: str) -> bool:
 
 
 def _contains_fallback_template(explanation: str) -> bool:
+    """Detect copied rule fallback wording that should not be LLM output."""
+
     lowered = explanation.casefold()
     fallback_fragments = (
         "aucun symptome d'alerte v1 detecte",
@@ -616,6 +684,8 @@ def _contains_fallback_template(explanation: str) -> bool:
 
 
 def _is_unexpected_script(character: str) -> bool:
+    """Reject non-Latin letter/script output from the model."""
+
     if (
         character.isascii()
         or character.isspace()

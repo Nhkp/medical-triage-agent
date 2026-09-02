@@ -44,6 +44,8 @@ RED_FLAGS = (
 
 @dataclass(frozen=True)
 class TriageResponse:
+    """Rule/LLM triage decision returned to callers and audit records."""
+
     priority: str
     explanation: str
     disclaimer: str
@@ -59,6 +61,8 @@ class TriageResponse:
     arbitration: str = "rule_only"
 
     def to_dict(self) -> dict[str, str]:
+        """Serialize the response into the public API's string-based contract."""
+
         return {
             "priority": self.priority,
             "rule_priority": self.rule_priority or self.priority,
@@ -75,6 +79,8 @@ class TriageResponse:
 
 
 def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Validate and lightly bound user-provided symptoms at the API boundary."""
+
     symptoms = payload.get("symptoms")
     if not isinstance(symptoms, list) or not symptoms:
         raise ValueError("symptoms must be a non-empty list of strings")
@@ -89,6 +95,8 @@ def validate_payload(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def assess_triage(payload: dict[str, Any]) -> TriageResponse:
+    """Apply the v1 red-flag triage rule and produce a clinician-review response."""
+
     payload = validate_payload(payload)
     symptoms = payload.get("symptoms", [])
     symptom_text = " ".join(symptoms) if isinstance(symptoms, list) else str(symptoms)
@@ -111,6 +119,8 @@ def assess_triage(payload: dict[str, Any]) -> TriageResponse:
 def audit_metadata(
     payload: dict[str, Any], response: TriageResponse, *, model: str = "rule_based_v1"
 ) -> dict[str, Any]:
+    """Build privacy-preserving metadata for later audit lookup."""
+
     redacted_payload = _redact_value(payload)
     return {
         "audit_id": response.audit_id,
@@ -136,15 +146,21 @@ def audit_metadata(
 
 
 def _audit_id(payload: dict[str, Any]) -> str:
+    """Derive a stable audit ID from the redacted request payload."""
+
     return f"audit_{_hash(_redact_value(payload))[:16]}"
 
 
 def _hash(value: Any) -> str:
+    """Hash canonical JSON for deterministic IDs and audit fingerprints."""
+
     canonical = json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def _redact_value(value: Any) -> Any:
+    """Recursively redact PII from strings inside JSON-like values."""
+
     if isinstance(value, str):
         return redact_pii(value)
     if isinstance(value, dict):

@@ -12,6 +12,8 @@ DEFAULT_API_URL = "http://127.0.0.1:8080"
 
 @dataclass(frozen=True)
 class ApiResult:
+    """HTTP result shape used by the optional Streamlit console."""
+
     ok: bool
     data: dict[str, Any] | None = None
     error: str | None = None
@@ -19,10 +21,14 @@ class ApiResult:
 
 
 def parse_symptoms(text: str) -> list[str]:
+    """Convert newline-separated UI input into symptom strings."""
+
     return [line.strip() for line in text.splitlines() if line.strip()]
 
 
 def endpoint_url(base_url: str, path: str) -> str:
+    """Join an API base URL and path without duplicate slashes."""
+
     return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
 
 
@@ -33,6 +39,8 @@ def request_json(
     payload: dict[str, Any] | None = None,
     timeout: float | None = None,
 ) -> ApiResult:
+    """Send a JSON request to the triage API and normalize success/error results."""
+
     body = json.dumps(payload).encode("utf-8") if payload is not None else None
     request = Request(
         endpoint_url(base_url, path),
@@ -54,6 +62,8 @@ def request_json(
 
 
 def _http_error_message(exc: HTTPError) -> str:
+    """Extract a readable FastAPI error detail from an HTTPError."""
+
     try:
         payload = json.loads(exc.read().decode("utf-8"))
     except (json.JSONDecodeError, UnicodeDecodeError):
@@ -63,6 +73,8 @@ def _http_error_message(exc: HTTPError) -> str:
 
 
 def run_app() -> None:
+    """Render the Streamlit triage API tester."""
+
     st: Any = import_module("streamlit")
 
     st.set_page_config(page_title="CHSA triage API tester", layout="centered")
@@ -97,6 +109,8 @@ def run_app() -> None:
 
 
 def _render_health(result: ApiResult) -> None:
+    """Render health-check results in the sidebar."""
+
     st: Any = import_module("streamlit")
     if result.ok and result.data is not None:
         st.sidebar.success(f"API: {result.data.get('status', 'unknown')}")
@@ -106,6 +120,8 @@ def _render_health(result: ApiResult) -> None:
 
 
 def _render_triage(result: ApiResult) -> None:
+    """Render triage output while preserving escalation visibility."""
+
     st: Any = import_module("streamlit")
     if not result.ok or result.data is None:
         st.error(result.error or "Triage request failed.")
@@ -148,6 +164,8 @@ def _render_triage(result: ApiResult) -> None:
 
 
 def _render_audit(result: ApiResult) -> None:
+    """Render redacted audit metadata or the lookup error."""
+
     st: Any = import_module("streamlit")
     if result.ok and result.data is not None:
         st.json(result.data)

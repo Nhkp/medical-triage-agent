@@ -16,10 +16,14 @@ PII_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
 
 
 def find_pii(text: str) -> list[str]:
+    """Return names of regex PII detectors that match the text."""
+
     return [name for name, pattern in PII_PATTERNS if pattern.search(text)]
 
 
 def redact_pii(text: str) -> str:
+    """Replace detected PII spans with typed redaction markers."""
+
     redacted = text
     for name, pattern in PII_PATTERNS:
         redacted = pattern.sub(f"[REDACTED_{name.upper()}]", redacted)
@@ -27,6 +31,8 @@ def redact_pii(text: str) -> str:
 
 
 def assert_no_pii(text: str) -> None:
+    """Raise when text matches any configured PII detector."""
+
     matches = find_pii(text)
     if matches:
         raise ValueError(f"possible PII detected: {', '.join(matches)}")

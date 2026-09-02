@@ -11,6 +11,8 @@ class OptionalDependencyError(RuntimeError):
 
 
 def set_deterministic_seed(seed: int) -> None:
+    """Seed available Python, NumPy, and Torch RNGs for reproducible experiments."""
+
     random.seed(seed)
     if importlib.util.find_spec("numpy") is not None:
         numpy: Any = import_module("numpy")
@@ -23,6 +25,8 @@ def set_deterministic_seed(seed: int) -> None:
 
 
 def cuda_supports_bf16() -> bool:
+    """Return whether the current Torch CUDA runtime supports bfloat16."""
+
     if importlib.util.find_spec("torch") is None:
         return False
     torch: Any = import_module("torch")
@@ -30,6 +34,8 @@ def cuda_supports_bf16() -> bool:
 
 
 def make_quantization_config(load_in_4bit: bool) -> Any | None:
+    """Build an optional BitsAndBytes 4-bit quantization config for QLoRA."""
+
     if not load_in_4bit:
         return None
     _require("bitsandbytes", "4-bit QLoRA")
@@ -46,6 +52,8 @@ def make_quantization_config(load_in_4bit: bool) -> Any | None:
 
 
 def torch_dtype_for_precision(precision: str) -> Any | None:
+    """Map a precision label to the Torch dtype expected by model loaders."""
+
     if precision == "fp32":
         return None
     _require("torch", f"{precision} model loading")
@@ -58,11 +66,15 @@ def torch_dtype_for_precision(precision: str) -> Any | None:
 
 
 def model_loading_dtype_kwargs(precision: str) -> dict[str, Any]:
+    """Return model loader kwargs for the configured precision."""
+
     dtype = torch_dtype_for_precision(precision)
     return {"dtype": dtype} if dtype is not None else {}
 
 
 def cast_trainable_parameters_to_fp32(model: Any) -> None:
+    """Keep trainable floating parameters in fp32 for stable adapter training."""
+
     _require("torch", "trainable parameter dtype normalization")
     torch: Any = import_module("torch")
     for parameter in model.parameters():
@@ -75,6 +87,8 @@ def cast_trainable_parameters_to_fp32(model: Any) -> None:
 
 
 def make_lora_config(config: dict[str, Any], target_modules: list[str] | None = None) -> Any:
+    """Create a PEFT LoRA config from validated training configuration values."""
+
     _require("peft", "LoRA adapter training")
     config_class: Any = import_module("peft").LoraConfig
 
@@ -91,6 +105,8 @@ def make_lora_config(config: dict[str, Any], target_modules: list[str] | None = 
 
 
 def detect_lora_target_modules(model: Any) -> list[str]:
+    """Detect common transformer projection modules suitable for LoRA adapters."""
+
     common_suffixes = ("q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj")
     found: set[str] = set()
     for name, _module in model.named_modules():
@@ -105,6 +121,8 @@ def detect_lora_target_modules(model: Any) -> list[str]:
 
 
 def _require(module_name: str, purpose: str) -> None:
+    """Raise a helpful training-extra error when an optional dependency is missing."""
+
     if importlib.util.find_spec(module_name) is None:
         raise OptionalDependencyError(
             f"{module_name} is required for {purpose}; run `uv sync --extra training`"

@@ -14,6 +14,8 @@ from urllib.request import urlopen
 
 
 def main() -> int:
+    """Launch vLLM and FastAPI processes for an interactive Colab serving session."""
+
     args = _parse_args()
     repo_root = Path(__file__).resolve().parents[1]
     commands = build_commands(args, repo_root)
@@ -38,6 +40,8 @@ def main() -> int:
 
 
 def build_commands(args: argparse.Namespace, repo_root: Path) -> dict[str, list[str]]:
+    """Build subprocess commands for vLLM, FastAPI, and dry-run diagnostics."""
+
     base_model = (
         args.base_model
         or os.environ.get("VLLM_BASE_MODEL_ID")
@@ -87,6 +91,8 @@ def build_commands(args: argparse.Namespace, repo_root: Path) -> dict[str, list[
 
 
 def _env(args: argparse.Namespace, repo_root: Path) -> dict[str, str]:
+    """Build environment variables shared by serving subprocesses."""
+
     env = os.environ.copy()
     env["PYTHONPATH"] = str(repo_root / "src")
     env["VLLM_BASE_URL"] = f"http://{args.host}:{args.vllm_port}/v1"
@@ -102,12 +108,16 @@ def _env(args: argparse.Namespace, repo_root: Path) -> dict[str, str]:
 
 
 def _start(command: list[str], env: dict[str, str]) -> subprocess.Popen[str]:
+    """Start a long-running subprocess and echo the command."""
+
     printable = " ".join(command)
     print(f"starting: {printable}", flush=True)
     return subprocess.Popen(command, env=env, text=True)
 
 
 def _wait_for(url: str, name: str, timeout: int) -> None:
+    """Poll a service URL until it is ready or the timeout expires."""
+
     deadline = time.monotonic() + timeout
     last_error = ""
     while time.monotonic() < deadline:
@@ -123,6 +133,8 @@ def _wait_for(url: str, name: str, timeout: int) -> None:
 
 
 def _expose_ngrok(port: int) -> str:
+    """Expose the local FastAPI port through pyngrok."""
+
     ngrok = import_module("pyngrok.ngrok")
     public_url = str(ngrok.connect(port))
     print(f"ngrok public URL: {public_url}", flush=True)
@@ -130,6 +142,8 @@ def _expose_ngrok(port: int) -> str:
 
 
 def _summary(args: argparse.Namespace, public_url: str | None) -> str:
+    """Render the ready message with local or public API URLs."""
+
     base_url = public_url or f"http://{args.host}:{args.api_port}"
     return "\n".join(
         [
@@ -148,11 +162,15 @@ def _summary(args: argparse.Namespace, public_url: str | None) -> str:
 
 
 def _wait_forever() -> None:
+    """Block until interrupted so child processes stay alive."""
+
     while True:
         time.sleep(3600)
 
 
 def _terminate(process: subprocess.Popen[str]) -> None:
+    """Terminate a child process gracefully before killing it."""
+
     if process.poll() is not None:
         return
     process.send_signal(signal.SIGTERM)
@@ -163,6 +181,8 @@ def _terminate(process: subprocess.Popen[str]) -> None:
 
 
 def _parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for Colab serving."""
+
     parser = argparse.ArgumentParser(description="Serve vLLM + FastAPI from a Colab GPU runtime")
     parser.add_argument("--model", help="Backward-compatible alias for --adapter")
     parser.add_argument("--base-model", help="Hugging Face base model loaded by vLLM")

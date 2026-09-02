@@ -11,6 +11,8 @@ from typing import Any
 
 @dataclass
 class Slide:
+    """Text and metric content extracted from one HTML slide."""
+
     title: str = ""
     eyebrow: str = ""
     subtitle: str = ""
@@ -19,7 +21,11 @@ class Slide:
 
 
 class DeckParser(html.parser.HTMLParser):
+    """Minimal HTML parser for the project presentation's slide markup."""
+
     def __init__(self) -> None:
+        """Initialize parser state for one deck traversal."""
+
         super().__init__()
         self.slides: list[Slide] = []
         self._current: Slide | None = None
@@ -28,6 +34,8 @@ class DeckParser(html.parser.HTMLParser):
         self._skip_depth = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        """Start collecting slide text for supported tags."""
+
         attrs_dict = dict(attrs)
         classes = set((attrs_dict.get("class") or "").split())
         if tag == "section" and "slide" in classes:
@@ -39,6 +47,8 @@ class DeckParser(html.parser.HTMLParser):
             self._skip_depth += 1
 
     def handle_endtag(self, tag: str) -> None:
+        """Finalize captured text or the current slide when tags close."""
+
         if tag == "aside" and self._skip_depth:
             self._skip_depth -= 1
             return
@@ -54,10 +64,14 @@ class DeckParser(html.parser.HTMLParser):
             self._buffer = []
 
     def handle_data(self, data: str) -> None:
+        """Capture text data unless it belongs to speaker notes."""
+
         if self._capture and not self._skip_depth:
             self._buffer.append(data)
 
     def _assign_text(self, tag: str, text: str) -> None:
+        """Route captured text into the slide field implied by its tag."""
+
         if not self._current:
             return
         if tag in {"h1", "h2"}:
@@ -73,6 +87,8 @@ class DeckParser(html.parser.HTMLParser):
 
 
 def main() -> int:
+    """Export the HTML presentation to a rendered or text-only PPTX file."""
+
     args = _parse_args()
     input_path = Path(args.input)
     output_path = Path(args.output)
@@ -97,6 +113,8 @@ def main() -> int:
 
 
 def parse_deck(path: Path) -> list[Slide]:
+    """Parse HTML slide sections into Slide objects."""
+
     parser = DeckParser()
     parser.feed(path.read_text(encoding="utf-8"))
     if not parser.slides:
@@ -112,6 +130,8 @@ def export_rendered_pptx(
     viewport_width: int,
     viewport_height: int,
 ) -> None:
+    """Capture rendered slide screenshots and place them in a PPTX deck."""
+
     try:
         from playwright.sync_api import Error as PlaywrightError
         from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
@@ -172,6 +192,8 @@ def export_rendered_pptx(
 
 
 def export_text_pptx(slides: list[Slide], output_path: Path) -> None:
+    """Build a lightweight PPTX deck from parsed slide text."""
+
     try:
         from pptx import Presentation  # type: ignore[import-untyped]
         from pptx.dml.color import RGBColor  # type: ignore[import-untyped]
@@ -222,6 +244,8 @@ def export_text_pptx(slides: list[Slide], output_path: Path) -> None:
 
 
 def _content(slide: Any, slide_data: Slide, ink: Any, muted: Any) -> None:
+    """Add metrics and bullet content to a fallback text slide."""
+
     top = 3.65
     if slide_data.metrics:
         values = _metric_pairs(slide_data.metrics)
@@ -237,6 +261,8 @@ def _content(slide: Any, slide_data: Slide, ink: Any, muted: Any) -> None:
 
 
 def _metric_pairs(items: list[str]) -> list[tuple[str, str]]:
+    """Pair alternating metric values and labels from parsed HTML text."""
+
     pairs: list[tuple[str, str]] = []
     pending: str | None = None
     for item in items:
@@ -249,6 +275,8 @@ def _metric_pairs(items: list[str]) -> list[tuple[str, str]]:
 
 
 def _background(slide: Any, prs: Any, color: Any) -> None:
+    """Fill a PPTX slide with a solid background color."""
+
     from pptx.enum.shapes import MSO_SHAPE  # type: ignore[import-untyped]
 
     shape = slide.shapes.add_shape(MSO_SHAPE.RECTANGLE, 0, 0, prs.slide_width, prs.slide_height)
@@ -258,6 +286,8 @@ def _background(slide: Any, prs: Any, color: Any) -> None:
 
 
 def _accent_bar(slide: Any, prs: Any, color: Any, index: int) -> None:
+    """Add the deck's right-side accent bar to a fallback slide."""
+
     from pptx.enum.shapes import MSO_SHAPE  # type: ignore[import-untyped]
     from pptx.util import Inches  # type: ignore[import-untyped]
 
@@ -284,6 +314,8 @@ def _textbox(
     *,
     bold: bool = False,
 ) -> None:
+    """Add one styled textbox to a fallback slide."""
+
     from pptx.enum.text import PP_ALIGN  # type: ignore[import-untyped]
     from pptx.util import Inches  # type: ignore[import-untyped]
 
@@ -300,16 +332,22 @@ def _textbox(
 
 
 def _pt(value: int) -> Any:
+    """Return a python-pptx point-size value."""
+
     from pptx.util import Pt  # type: ignore[import-untyped]
 
     return Pt(value)
 
 
 def _clean(text: str) -> str:
+    """Collapse HTML whitespace into a single text string."""
+
     return re.sub(r"\s+", " ", text).strip()
 
 
 def _parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for presentation export."""
+
     parser = argparse.ArgumentParser(description="Export the HTML project presentation to PPTX")
     parser.add_argument("--input", default="presentations/chsa-current-state/index.html")
     parser.add_argument("--output", default="dist/presentations/chsa-current-state.pptx")

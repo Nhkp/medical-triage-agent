@@ -9,6 +9,8 @@ PATTERN = re.compile(r"^(feat|fix|docs|test|refactor|chore|ci|build)(\([a-z0-9_.
 
 
 def main() -> int:
+    """Validate a commit message file against the project convention."""
+
     if len(sys.argv) != 2:
         print("usage: check_commit_msg.py <commit-msg-file>", file=sys.stderr)
         return 2

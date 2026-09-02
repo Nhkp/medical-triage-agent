@@ -6,6 +6,8 @@ from pathlib import Path
 
 @dataclass(frozen=True)
 class SourceRecord:
+    """One registered dataset source from docs/data-sources.md."""
+
     id: str
     name: str
     url: str
@@ -17,10 +19,14 @@ class SourceRecord:
 
     @property
     def ingestible(self) -> bool:
+        """Return whether source metadata is verified enough for ingestion."""
+
         return self.status == "verified" and self.license not in {"", "to_verify", "unknown"}
 
 
 def load_source_registry(path: Path = Path("docs/data-sources.md")) -> dict[str, SourceRecord]:
+    """Parse the markdown data-source registry into SourceRecord objects."""
+
     lines = path.read_text(encoding="utf-8").splitlines()
     table_lines = [line for line in lines if line.startswith("|")]
     if len(table_lines) < 3:
@@ -53,6 +59,8 @@ def load_source_registry(path: Path = Path("docs/data-sources.md")) -> dict[str,
 
 
 def validate_source_ids(source_ids: list[str], registry: dict[str, SourceRecord]) -> None:
+    """Require source IDs to exist and be ingestible."""
+
     for source_id in source_ids:
         if source_id not in registry:
             raise ValueError(f"unknown source id: {source_id}")
@@ -65,6 +73,8 @@ def validate_source_for_use(
     intended_use: str,
     registry: dict[str, SourceRecord],
 ) -> SourceRecord:
+    """Return a source only if it is registered for the requested use."""
+
     validate_source_ids([source_id], registry)
     source = registry[source_id]
     if intended_use not in source.intended_use:
@@ -73,8 +83,12 @@ def validate_source_for_use(
 
 
 def _cells(line: str) -> list[str]:
+    """Split a markdown table row into trimmed cell values."""
+
     return [cell.strip() for cell in line.strip().strip("|").split("|")]
 
 
 def _split_csv(value: str) -> tuple[str, ...]:
+    """Parse comma-separated table cells into normalized tuples."""
+
     return tuple(part.strip() for part in value.split(",") if part.strip())

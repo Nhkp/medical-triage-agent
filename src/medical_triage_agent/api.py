@@ -9,6 +9,8 @@ _AUDIT_STORE: dict[str, dict[str, Any]] = {}
 
 
 def triage(payload: dict[str, Any]) -> dict[str, str]:
+    """Run rule-first triage, optionally enrich with LLM output, and persist audit data."""
+
     rule_response = assess_triage(payload)
     generation_result = generate_triage(payload, rule_response)
     final_priority, priority_source, arbitration = _arbitrate_priority(
@@ -39,6 +41,8 @@ def triage(payload: dict[str, Any]) -> dict[str, str]:
 
 
 def _arbitrate_priority(rule_priority: str, llm_priority: str | None) -> tuple[str, str, str]:
+    """Keep the rule priority authoritative unless the LLM exactly agrees."""
+
     if llm_priority is None:
         return rule_priority, "rule", "rule_only"
     if llm_priority == rule_priority:
@@ -47,10 +51,14 @@ def _arbitrate_priority(rule_priority: str, llm_priority: str | None) -> tuple[s
 
 
 def audit(audit_id: str) -> dict[str, Any] | None:
+    """Return a stored audit record for the current process, if present."""
+
     return _AUDIT_STORE.get(audit_id)
 
 
 def health() -> dict[str, str]:
+    """Report service readiness and whether remote vLLM generation is configured."""
+
     return {
         "status": "ok",
         "model": configured_model(),
@@ -59,16 +67,22 @@ def health() -> dict[str, str]:
 
 
 def create_app() -> Any:
+    """Create the FastAPI app without importing FastAPI at package import time."""
+
     from fastapi import FastAPI, HTTPException
 
     app = FastAPI(title="CHSA medical triage POC")
 
     @app.get("/health")
     def health_endpoint() -> dict[str, str]:
+        """Expose health metadata for probes and smoke tests."""
+
         return health()
 
     @app.post("/triage")
     def triage_endpoint(payload: dict[str, Any]) -> dict[str, str]:
+        """Expose the triage API and translate validation failures to HTTP 400."""
+
         try:
             return triage(payload)
         except ValueError as exc:
@@ -76,6 +90,8 @@ def create_app() -> Any:
 
     @app.get("/audit/{audit_id}")
     def audit_endpoint(audit_id: str) -> dict[str, Any]:
+        """Expose redacted audit metadata for a known audit ID."""
+
         record = audit(audit_id)
         if record is None:
             raise HTTPException(status_code=404, detail="audit record not found")

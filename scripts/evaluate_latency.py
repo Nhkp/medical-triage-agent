@@ -25,6 +25,8 @@ CASES: tuple[dict[str, Any], ...] = (
 
 
 def main() -> int:
+    """Run latency evaluation and write or print the JSON result."""
+
     args = _parse_args()
     result = run_latency_eval(url=args.url, iterations=args.iterations)
     serialized = json.dumps(result, ensure_ascii=False, indent=2) + "\n"
@@ -37,6 +39,8 @@ def main() -> int:
 
 
 def run_latency_eval(*, url: str | None, iterations: int) -> dict[str, Any]:
+    """Measure repeated triage calls in-process or against a remote API."""
+
     latencies_ms: list[float] = []
     errors = 0
     lengths: list[int] = []
@@ -65,6 +69,8 @@ def run_latency_eval(*, url: str | None, iterations: int) -> dict[str, Any]:
 
 
 def _call_remote(url: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """POST one triage payload to a remote FastAPI service."""
+
     request = Request(
         f"{url.rstrip('/')}/triage",
         data=json.dumps(payload).encode("utf-8"),
@@ -76,6 +82,8 @@ def _call_remote(url: str, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _percentile(values: list[float], percentile: int) -> float:
+    """Return a rounded nearest-rank percentile for latency samples."""
+
     if not values:
         return 0.0
     ordered = sorted(values)
@@ -84,6 +92,8 @@ def _percentile(values: list[float], percentile: int) -> float:
 
 
 def _parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for latency evaluation."""
+
     parser = argparse.ArgumentParser(description="Measure CHSA triage API latency")
     parser.add_argument("--url", help="FastAPI base URL; omit for in-process fallback")
     parser.add_argument("--iterations", type=int, default=12)

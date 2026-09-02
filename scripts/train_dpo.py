@@ -25,6 +25,8 @@ from medical_triage_agent.modeling import (
 
 
 def main() -> int:
+    """Load DPO config, support dry runs, and launch training."""
+
     args = _parse_args()
     config = load_training_config(
         args.config,
@@ -47,6 +49,8 @@ def run_training(
     max_train_samples: int | None = None,
     resume: str | None = None,
 ) -> None:
+    """Run DPO training with optional SFT adapter initialization."""
+
     from datasets import Dataset  # type: ignore[import-not-found]
     from peft import PeftModel  # type: ignore[import-not-found]
     from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-not-found]
@@ -132,6 +136,8 @@ def run_training(
 def _load_dpo_dataset(
     path: Path, *, tokenizer: Any, system_message: str | None, max_samples: int | None
 ) -> list[dict[str, Any]]:
+    """Load DPO JSONL rows and convert them to TRL preference rows."""
+
     rows = [
         dpo_to_training_row(
             DPOExample.from_mapping(row),
@@ -144,6 +150,8 @@ def _load_dpo_dataset(
 
 
 def _make_dpo_config(config_class: Any, **kwargs: Any) -> Any:
+    """Filter DPOConfig kwargs for the installed TRL version."""
+
     supported = set(inspect.signature(config_class).parameters)
     filtered = {key: value for key, value in kwargs.items() if key in supported}
     if "eval_strategy" in kwargs and "evaluation_strategy" in supported:
@@ -152,6 +160,8 @@ def _make_dpo_config(config_class: Any, **kwargs: Any) -> Any:
 
 
 def _parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for DPO training."""
+
     parser = argparse.ArgumentParser(description="Run Kaggle-friendly DPO after SFT")
     parser.add_argument("--config", default="configs/dpo.yaml")
     parser.add_argument("--max-steps", type=int)
@@ -164,6 +174,8 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
+    """Translate CLI flags into dotted training-config overrides."""
+
     overrides: dict[str, Any] = {}
     if args.max_steps is not None:
         overrides["training.max_steps"] = args.max_steps
@@ -175,6 +187,8 @@ def _cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _dry_run_summary(config: TrainingConfig) -> dict[str, Any]:
+    """Return planned DPO training settings without loading models."""
+
     return {
         "method": config.method,
         "model": config.model_name(),

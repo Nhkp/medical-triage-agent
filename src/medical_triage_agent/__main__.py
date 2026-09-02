@@ -22,6 +22,8 @@ from medical_triage_agent.source_registry import load_source_registry
 
 
 def main() -> int:
+    """Run the project CLI for source, dataset, and safety workflows."""
+
     parser = argparse.ArgumentParser(prog="medical-triage-agent")
     subparsers = parser.add_subparsers(dest="command", required=True)
 

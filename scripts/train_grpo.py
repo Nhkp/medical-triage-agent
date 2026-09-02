@@ -24,6 +24,8 @@ from medical_triage_agent.modeling import (
 
 
 def main() -> int:
+    """Load GRPO config, support dry runs, and launch the optional POC trainer."""
+
     args = _parse_args()
     config = load_training_config(
         args.config,
@@ -46,6 +48,8 @@ def run_training(
     max_train_samples: int | None = None,
     resume: str | None = None,
 ) -> None:
+    """Run the optional GRPO proof of concept with a simple medical-safety reward."""
+
     from datasets import Dataset  # type: ignore[import-not-found]
     from peft import PeftModel  # type: ignore[import-not-found]
     from transformers import AutoModelForCausalLM, AutoTokenizer  # type: ignore[import-not-found]
@@ -120,6 +124,8 @@ def run_training(
 def _load_grpo_dataset(
     path: Path, *, tokenizer: Any, system_message: str | None, max_samples: int | None
 ) -> list[dict[str, Any]]:
+    """Load SFT rows and render prompt-only GRPO training records."""
+
     rows = [
         {
             "id": example.id,
@@ -136,6 +142,8 @@ def _load_grpo_dataset(
 
 
 def _medical_safety_reward(completions: list[str], **_: Any) -> list[float]:
+    """Reward responses that avoid diagnosis wording and include care escalation language."""
+
     return [
         float(
             "diagnosis" not in completion.casefold()
@@ -146,11 +154,15 @@ def _medical_safety_reward(completions: list[str], **_: Any) -> list[float]:
 
 
 def _make_grpo_config(config_class: Any, **kwargs: Any) -> Any:
+    """Filter GRPOConfig kwargs for the installed TRL version."""
+
     supported = set(inspect.signature(config_class).parameters)
     return config_class(**{key: value for key, value in kwargs.items() if key in supported})
 
 
 def _parse_args() -> argparse.Namespace:
+    """Parse CLI arguments for GRPO training."""
+
     parser = argparse.ArgumentParser(description="Run a small optional GRPO POC")
     parser.add_argument("--config", default="configs/grpo.yaml")
     parser.add_argument("--max-steps", type=int)
@@ -163,6 +175,8 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
+    """Translate CLI flags into dotted training-config overrides."""
+
     overrides: dict[str, Any] = {}
     if args.max_steps is not None:
         overrides["training.max_steps"] = args.max_steps
@@ -174,6 +188,8 @@ def _cli_overrides(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def _dry_run_summary(config: TrainingConfig) -> dict[str, Any]:
+    """Return planned GRPO settings without loading models."""
+
     return {
         "method": config.method,
         "model": config.model_name(),
