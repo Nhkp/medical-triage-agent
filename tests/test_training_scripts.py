@@ -153,7 +153,14 @@ def test_train_experiment_dry_run_reports_mlflow_ngrok_command() -> None:
 
     payload = json.loads(result.stdout)
     assert payload["mlflow_ngrok"] is True
-    assert payload["mlflow_ui"][-4:] == ["--host", "127.0.0.1", "--port", "5050"]
+    assert payload["mlflow_ui"][-6:] == [
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "5050",
+        "--allowed-hosts",
+        "localhost,127.0.0.1,*.ngrok-free.dev,*.ngrok.io",
+    ]
     assert "mlflow" in payload["mlflow_ui"]
 
 
@@ -260,6 +267,7 @@ def argparse_namespace(**overrides: Any) -> Any:
         "mlflow_ui_host": "127.0.0.1",
         "mlflow_ui_port": 5000,
         "mlflow_ngrok": False,
+        "mlflow_allowed_hosts": "localhost,127.0.0.1,*.ngrok-free.dev,*.ngrok.io",
     }
     values.update(overrides)
 

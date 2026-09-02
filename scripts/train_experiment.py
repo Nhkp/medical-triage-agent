@@ -252,6 +252,8 @@ def _mlflow_ui_command(args: argparse.Namespace) -> list[str]:
         args.mlflow_ui_host,
         "--port",
         str(args.mlflow_ui_port),
+        "--allowed-hosts",
+        args.mlflow_allowed_hosts,
     ]
 
 
@@ -330,6 +332,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--mlflow-ui-host", default="127.0.0.1")
     parser.add_argument("--mlflow-ui-port", type=int, default=5000)
     parser.add_argument("--mlflow-ui-timeout", type=int, default=60)
+    parser.add_argument(
+        "--mlflow-allowed-hosts",
+        default="localhost,127.0.0.1,*.ngrok-free.dev,*.ngrok.io",
+        help="Comma-separated MLflow UI Host headers allowed through the tunnel",
+    )
     args = parser.parse_args()
     args.sft_output_dir = (
         args.sft_output_dir or Path("outputs/experiments") / args.dataset_label / "sft"
