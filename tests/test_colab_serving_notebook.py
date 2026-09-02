@@ -84,3 +84,28 @@ def test_kaggle_model_comparison_notebook_references_models_and_outputs() -> Non
     assert "structured JSON constraints" in text
     assert "hf_" not in source
     assert "HF_TOKEN =" not in source
+
+
+def test_kaggle_training_notebook_supports_tracked_5k_and_8k_experiments() -> None:
+    path = Path("notebooks/kaggle_training.ipynb")
+    assert path.exists()
+    notebook = json.loads(path.read_text(encoding="utf-8"))
+    source = "\n".join(
+        "".join(cell.get("source", [])) for cell in notebook["cells"] if cell["cell_type"] == "code"
+    )
+
+    for expected in (
+        'DATASET_SIZE = "8k"',
+        "Lokhidor/medical-triage-dataset",
+        "Lokhidor/medical-triage-dataset-8k",
+        "NGROK_AUTHTOKEN",
+        "mlflow pyngrok",
+        "scripts/train_experiment.py",
+        "--mlflow-ngrok",
+        "--mlflow-ui-port",
+        "--dry-run",
+        "mlruns outputs/experiments",
+    ):
+        assert expected in source
+
+    assert "HF_TOKEN =" not in source
