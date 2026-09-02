@@ -159,7 +159,7 @@ def test_train_experiment_dry_run_reports_mlflow_ngrok_command() -> None:
         "--port",
         "5050",
         "--allowed-hosts",
-        "localhost,127.0.0.1,*.ngrok-free.dev,*.ngrok.io",
+        "localhost,127.0.0.1,*.ngrok-free.dev,*.ngrok.io,127.0.0.1:5050,localhost:5050",
     ]
     assert "mlflow" in payload["mlflow_ui"]
 

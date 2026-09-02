@@ -253,8 +253,19 @@ def _mlflow_ui_command(args: argparse.Namespace) -> list[str]:
         "--port",
         str(args.mlflow_ui_port),
         "--allowed-hosts",
-        args.mlflow_allowed_hosts,
+        _mlflow_allowed_hosts(args),
     ]
+
+
+def _mlflow_allowed_hosts(args: argparse.Namespace) -> str:
+    """Return MLflow Host headers allowed for local probes and ngrok URLs."""
+
+    hosts = [host.strip() for host in args.mlflow_allowed_hosts.split(",") if host.strip()]
+    for host in (args.mlflow_ui_host, "127.0.0.1", "localhost"):
+        if host == "0.0.0.0":
+            continue
+        hosts.append(f"{host}:{args.mlflow_ui_port}")
+    return ",".join(dict.fromkeys(hosts))
 
 
 def _start_mlflow_ui(args: argparse.Namespace) -> subprocess.Popen[str]:
