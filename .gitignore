@@ -18,3 +18,5 @@ kaggle/input/
 wandb/
 runs/
 .cache/
+*.db
+mlruns/
