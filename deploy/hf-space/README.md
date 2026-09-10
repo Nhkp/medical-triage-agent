@@ -2,8 +2,9 @@
 title: CHSA Medical Triage Streamlit
 colorFrom: blue
 colorTo: green
-sdk: docker
-app_port: 8501
+sdk: streamlit
+sdk_version: 1.50.0
+app_file: app.py
 pinned: false
 ---
 
