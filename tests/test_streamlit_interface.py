@@ -59,6 +59,18 @@ def test_endpoint_url_handles_trailing_slashes() -> None:
     assert ui.endpoint_url("https://example.test/", "/triage") == "https://example.test/triage"
 
 
+def test_default_api_url_uses_modal_env_when_configured(monkeypatch: Any) -> None:
+    monkeypatch.setenv("MODAL_API_URL", "https://medical-triage.modal.run")
+
+    assert ui.default_api_url() == "https://medical-triage.modal.run"
+
+
+def test_default_api_url_falls_back_to_localhost(monkeypatch: Any) -> None:
+    monkeypatch.delenv("MODAL_API_URL", raising=False)
+
+    assert ui.default_api_url() == "http://127.0.0.1:8080"
+
+
 def test_request_json_returns_decoded_payload(monkeypatch: Any) -> None:
     def fake_urlopen(_request: Any, timeout: float | None) -> _Response:
         assert timeout is None
@@ -67,6 +79,36 @@ def test_request_json_returns_decoded_payload(monkeypatch: Any) -> None:
     monkeypatch.setattr(ui, "urlopen", fake_urlopen)
 
     assert ui.request_json("GET", "http://api.test", "/health").data == {"status": "ok"}
+
+
+def test_request_json_sends_bearer_token_when_provided(monkeypatch: Any) -> None:
+    def fake_urlopen(request: Any, timeout: float | None) -> _Response:
+        assert timeout is None
+        assert request.get_header("Authorization") == "Bearer secret-token"
+        return _Response(b'{"priority": "moderee"}')
+
+    monkeypatch.setattr(ui, "urlopen", fake_urlopen)
+
+    result = ui.request_json(
+        "POST",
+        "http://api.test",
+        "/triage",
+        {"symptoms": ["fatigue"]},
+        bearer_token=" secret-token ",
+    )
+
+    assert result.ok is True
+
+
+def test_request_json_omits_auth_for_public_health(monkeypatch: Any) -> None:
+    def fake_urlopen(request: Any, timeout: float | None) -> _Response:
+        assert timeout is None
+        assert request.get_header("Authorization") is None
+        return _Response(b'{"status": "ok"}')
+
+    monkeypatch.setattr(ui, "urlopen", fake_urlopen)
+
+    assert ui.request_json("GET", "http://api.test", "/health").ok is True
 
 
 def test_request_json_reports_http_error(monkeypatch: Any) -> None:

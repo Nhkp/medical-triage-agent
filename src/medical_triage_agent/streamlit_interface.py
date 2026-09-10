@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import dataclass
 from importlib import import_module
 from typing import Any
@@ -8,6 +9,8 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 DEFAULT_API_URL = "http://127.0.0.1:8080"
+MODAL_API_URL_ENV = "MODAL_API_URL"
+TRIAGE_API_TOKEN_ENV = "TRIAGE_API_TOKEN"
 
 
 @dataclass(frozen=True)
@@ -32,12 +35,25 @@ def endpoint_url(base_url: str, path: str) -> str:
     return f"{base_url.rstrip('/')}/{path.lstrip('/')}"
 
 
+def default_api_url() -> str:
+    """Return the configured Modal API URL, or localhost for local development."""
+
+    return os.environ.get(MODAL_API_URL_ENV, "").strip() or DEFAULT_API_URL
+
+
+def auth_headers(token: str | None) -> dict[str, str]:
+    """Build optional bearer auth headers for Modal-protected API endpoints."""
+
+    return {"Authorization": f"Bearer {token.strip()}"} if token and token.strip() else {}
+
+
 def request_json(
     method: str,
     base_url: str,
     path: str,
     payload: dict[str, Any] | None = None,
     timeout: float | None = None,
+    bearer_token: str | None = None,
 ) -> ApiResult:
     """Send a JSON request to the triage API and normalize success/error results."""
 
@@ -46,7 +62,7 @@ def request_json(
         endpoint_url(base_url, path),
         data=body,
         method=method,
-        headers={"Content-Type": "application/json"},
+        headers={"Content-Type": "application/json", **auth_headers(bearer_token)},
     )
     try:
         with urlopen(request, timeout=timeout) as response:
@@ -81,9 +97,10 @@ def run_app() -> None:
     st.title("CHSA triage API tester")
     st.caption("Optional Streamlit console for the FastAPI/vLLM proof of concept.")
 
-    api_url = st.sidebar.text_input("API base URL", value=DEFAULT_API_URL)
+    api_url = st.sidebar.text_input("API base URL", value=default_api_url())
+    bearer_token = os.environ.get(TRIAGE_API_TOKEN_ENV, "")
     st.sidebar.caption(
-        "Use localhost for local FastAPI, or your Kaggle/ngrok URL. No client timeout is applied."
+        "Use localhost for local FastAPI, or your Modal API URL. No client timeout is applied."
     )
 
     if st.sidebar.button("Check API health"):
@@ -100,12 +117,20 @@ def run_app() -> None:
         if not symptoms:
             st.warning("Add at least one symptom.")
         else:
-            _render_triage(request_json("POST", api_url, "/triage", {"symptoms": symptoms}))
+            _render_triage(
+                request_json(
+                    "POST",
+                    api_url,
+                    "/triage",
+                    {"symptoms": symptoms},
+                    bearer_token=bearer_token,
+                )
+            )
 
     st.divider()
     audit_id = st.text_input("Audit ID", value=st.session_state.get("last_audit_id", ""))
     if st.button("View audit metadata") and audit_id:
-        _render_audit(request_json("GET", api_url, f"/audit/{audit_id}"))
+        _render_audit(request_json("GET", api_url, f"/audit/{audit_id}", bearer_token=bearer_token))
 
 
 def _render_health(result: ApiResult) -> None:
