@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import json
 
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
@@ -12,14 +13,28 @@ def test_modal_vllm_command_serves_default_dpo_adapter() -> None:
     command = module.build_vllm_command()
 
     assert command[:3] == ["vllm", "serve", "Qwen/Qwen3-1.7B-Base"]
+    assert command[command.index("--revision") + 1] == ("ea980cb0a6c2ae4b936e82123acc929f1cec04c1")
     assert "--enable-lora" in command
     assert "--lora-modules" in command
-    assert "medical-triage-dpo-8k=Lokhidor/medical-triage-qwen3-dpo-lora-8k" in command
+    lora_module = json.loads(command[command.index("--lora-modules") + 1])
+    assert lora_module == {
+        "name": "medical-triage-dpo-8k",
+        "path": "Lokhidor/medical-triage-qwen3-dpo-lora-8k",
+        "base_model_name": "Qwen/Qwen3-1.7B-Base",
+    }
     assert command[command.index("--served-model-name") + 1] == "medical-triage-dpo-8k"
     assert command[command.index("--host") + 1] == "127.0.0.1"
     assert command[command.index("--port") + 1] == "8000"
     assert command[command.index("--max-model-len") + 1] == "4096"
     assert command[command.index("--gpu-memory-utilization") + 1] == "0.70"
+    assert "--enforce-eager" in command
+
+
+def test_modal_image_pins_transformers_for_vllm_tokenizer_compatibility() -> None:
+    module = importlib.import_module("deploy.modal_app")
+
+    assert "vllm==0.10.2" in module.IMAGE_PACKAGES
+    assert "transformers==4.56.2" in module.IMAGE_PACKAGES
 
 
 def test_modal_runtime_env_points_fastapi_to_local_vllm() -> None:

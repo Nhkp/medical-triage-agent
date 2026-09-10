@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hmac
+import json
 import os
 import subprocess
 import time
@@ -17,11 +18,22 @@ from starlette.responses import JSONResponse, Response
 
 APP_NAME = "medical-triage-agent"
 BASE_MODEL = "Qwen/Qwen3-1.7B-Base"
+BASE_MODEL_REVISION = "ea980cb0a6c2ae4b936e82123acc929f1cec04c1"
 ADAPTER_REPO = "Lokhidor/medical-triage-qwen3-dpo-lora-8k"
+ADAPTER_REVISION = "9f1c83f91064a8b464bc9e8b87f91231c617b2e7"
 SERVED_MODEL_NAME = "medical-triage-dpo-8k"
 VLLM_HOST = "127.0.0.1"
 VLLM_PORT = 8000
 VLLM_STARTUP_TIMEOUT_SECONDS = 900
+FAST_BOOT = True
+IMAGE_PACKAGES = [
+    "fastapi>=0.116.0",
+    "huggingface_hub[hf_transfer]>=0.35.0",
+    "transformers==4.56.2",
+    "uvicorn[standard]>=0.35.0",
+    "vllm==0.10.2",
+    "wrapt>=1.16.0",
+]
 
 hf_cache_volume = modal.Volume.from_name("medical-triage-hf-cache", create_if_missing=True)
 vllm_cache_volume = modal.Volume.from_name("medical-triage-vllm-cache", create_if_missing=True)
@@ -29,16 +41,10 @@ vllm_cache_volume = modal.Volume.from_name("medical-triage-vllm-cache", create_i
 image = (
     modal.Image.from_registry("nvidia/cuda:12.8.0-devel-ubuntu22.04", add_python="3.12")
     .entrypoint([])
-    .uv_pip_install(
-        "fastapi>=0.116.0",
-        "huggingface_hub[hf_transfer]>=0.35.0",
-        "uvicorn[standard]>=0.35.0",
-        "vllm==0.10.2",
-        "wrapt>=1.16.0",
-    )
-    .add_local_dir("src", remote_path="/app/src")
+    .uv_pip_install(*IMAGE_PACKAGES)
     .workdir("/app")
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "PYTHONPATH": "/app/src"})
+    .add_local_dir("src", remote_path="/app/src")
 )
 
 app = modal.App(APP_NAME)
@@ -66,22 +72,30 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
 def build_vllm_command(
     *,
     base_model: str = BASE_MODEL,
+    base_model_revision: str = BASE_MODEL_REVISION,
     adapter_repo: str = ADAPTER_REPO,
     served_model_name: str = SERVED_MODEL_NAME,
     host: str = VLLM_HOST,
     port: int = VLLM_PORT,
     max_model_len: int = 4096,
     gpu_memory_utilization: str = "0.70",
+    fast_boot: bool = FAST_BOOT,
 ) -> list[str]:
     """Build the vLLM command used by Modal and tests."""
 
-    return [
+    command = [
         "vllm",
         "serve",
         base_model,
+        "--revision",
+        base_model_revision,
         "--enable-lora",
         "--lora-modules",
-        f"{served_model_name}={adapter_repo}",
+        build_lora_module_spec(
+            name=served_model_name,
+            path=adapter_repo,
+            base_model_name=base_model,
+        ),
         "--served-model-name",
         served_model_name,
         "--host",
@@ -93,6 +107,19 @@ def build_vllm_command(
         "--gpu-memory-utilization",
         gpu_memory_utilization,
     ]
+    command.append("--enforce-eager" if fast_boot else "--no-enforce-eager")
+    return command
+
+
+def build_lora_module_spec(*, name: str, path: str, base_model_name: str) -> str:
+    """Build the vLLM LoRA module spec with parent model lineage."""
+
+    # ponytail: vLLM static LoRA specs do not expose a separate revision field; keep
+    # the adapter SHA documented and add CLI support here if vLLM grows that option.
+    return json.dumps(
+        {"name": name, "path": path, "base_model_name": base_model_name},
+        separators=(",", ":"),
+    )
 
 
 def build_runtime_env(
@@ -183,6 +210,7 @@ async def lifespan(_web_app: Any) -> AsyncIterator[None]:
     scaledown_window=900,
     startup_timeout=VLLM_STARTUP_TIMEOUT_SECONDS,
     timeout=3600,
+    # Modal 1.5.5 @app.function does not expose @app.server target_concurrency.
 )
 @modal.asgi_app()
 def fastapi_app() -> Any:
