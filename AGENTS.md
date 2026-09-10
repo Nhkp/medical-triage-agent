@@ -10,14 +10,21 @@ an autonomous diagnosis or treatment system.
 - Reuse existing tools, patterns, and helpers before creating new ones.
 - Keep diffs small and centered on the request.
 - Add a runnable test for any non-trivial logic.
-- Follow `docs/code-guidelines.md`, `docs/commit-guidelines.md`, and
-  `docs/git-workflow.md`.
 - Use `docs/agents/readme-agent.md` when changing `README.md`.
 - Use `docs/agents/presentation-agent.md` when changing presentation material.
 - Follow source intake rules in `docs/source-policy.md`.
 - Follow medical safety limits in `docs/medical-safety.md`.
 - Follow privacy and RGPD rules in `docs/privacy-rgpd.md`.
 - Document structural decisions in `docs/decisions/`.
+
+### Git / commits
+
+Before creating any Git commit:
+
+1. Read and follow `docs/git-workflow.md`.
+2. Treat the rules in that file as mandatory.
+3. Do not commit until all required checks described there have passed.
+4. Generate the commit message according to the conventions in that file.
 
 ## Expected commands
 

@@ -1,5 +1,8 @@
 # Commit guidelines
 
+For verification, begin every response with:
+`GIT AGENTS ACTIVE`
+
 ## Principles
 
 - A commit must be independent: it should be understandable, reviewable, and revertable
