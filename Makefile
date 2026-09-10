@@ -39,7 +39,7 @@ PRESENTATION_OUT ?= dist/presentations/chsa-current-state.pptx
 # Optional API URL used by evaluation targets when testing a running service.
 API_URL ?=
 
-.PHONY: sync sync-training sync-ui sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean data-pull-5k data-pull-8k data-audit-5k data-audit-8k data-summary-5k data-summary-8k train-sft-smoke train-dpo-smoke train-grpo-smoke train-5k train-8k pipeline-5k pipeline-8k pipeline-all mlflow-ui eval-models eval-model-comparison-dry-run eval-model-comparison serve-local serve-api serve-ui serve-colab-dry-run serve-kaggle-dry-run eval-latency eval-robustness step3-ready presentation-browser presentation-html presentation-pptx presentation-ready clean
+.PHONY: sync sync-training sync-ui sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean data-pull-5k data-pull-8k data-audit-5k data-audit-8k data-summary-5k data-summary-8k train-sft-smoke train-dpo-smoke train-grpo-smoke train-5k train-8k pipeline-5k pipeline-8k pipeline-all mlflow-ui deploy deploy-dry-run eval-models eval-model-comparison-dry-run eval-model-comparison serve-local serve-api serve-ui serve-colab-dry-run serve-kaggle-dry-run eval-latency eval-robustness step3-ready presentation-browser presentation-html presentation-pptx presentation-ready clean
 
 # Install the default project dependencies.
 sync:
@@ -165,6 +165,14 @@ pipeline-all: pipeline-5k pipeline-8k
 # Start the local MLflow UI for inspecting experiment runs.
 mlflow-ui: sync-training
 	uv run --extra training mlflow ui --backend-store-uri $(MLFLOW_TRACKING_URI)
+
+# Sync Modal secrets from .env and deploy the online serving app.
+deploy:
+	uv run python scripts/deploy_modal.py
+
+# Validate the Modal deployment commands without touching Modal.
+deploy-dry-run:
+	uv run python scripts/deploy_modal.py --dry-run
 
 # Dry-run the base model evaluation startup.
 eval-models:
