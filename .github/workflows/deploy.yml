@@ -2,15 +2,85 @@ name: deploy-demo
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "demo-*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-demo-modal
+  cancel-in-progress: false
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - run: uv sync --locked
+      - run: make check
       - uses: docker/setup-buildx-action@v4
       - run: docker build -t medical-triage-agent-demo .
-      - run: docker compose --env-file .env.example config
+      - run: docker compose --env-file .env.example config --quiet
+      - name: Deploy Modal
+        env:
+          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          TRIAGE_API_TOKEN: ${{ secrets.TRIAGE_API_TOKEN }}
+          MODAL_URL: ${{ vars.MODAL_URL }}
+        run: |
+          uv run python - <<'PYTHON'
+          import os
+          import shlex
+          import subprocess
+          import tempfile
+          from pathlib import Path
+          from urllib.parse import urlsplit
+
+          required = ("MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET", "HF_TOKEN", "TRIAGE_API_TOKEN")
+          missing = [key for key in required if not os.environ.get(key, "").strip()]
+          if missing:
+              raise SystemExit("Missing GitHub secrets: " + ", ".join(missing))
+          url = urlsplit(os.environ.get("MODAL_URL", ""))
+          if url.scheme != "https" or not url.hostname or url.username or url.password:
+              raise SystemExit("Set the MODAL_URL GitHub variable to the HTTPS demo URL")
+          with tempfile.TemporaryDirectory(prefix="modal-deploy-") as directory:
+              env_file = Path(directory) / ".env"
+              env_file.touch(mode=0o600)
+              env_file.write_text("".join(
+                  f"{key}={shlex.quote(os.environ[key])}\n"
+                  for key in ("HF_TOKEN", "TRIAGE_API_TOKEN")
+              ), encoding="utf-8")
+              subprocess.run([
+                  "uv", "run", "python", "scripts/deploy_modal.py",
+                  "--env-file", str(env_file),
+              ], check=True)
+          PYTHON
+      - name: Check demo health
+        env:
+          MODAL_URL: ${{ vars.MODAL_URL }}
+        run: |
+          uv run python - <<'PYTHON'
+          import os
+          import time
+          from urllib.error import URLError
+          from urllib.request import urlopen
+
+          url = os.environ["MODAL_URL"].rstrip("/") + "/health"
+          deadline = time.monotonic() + 900
+          while (remaining := deadline - time.monotonic()) > 0:
+              try:
+                  with urlopen(url, timeout=min(10, remaining)) as response:
+                      if response.status == 200:
+                          print("Demo health check passed")
+                          break
+              except (OSError, URLError):
+                  pass
+              time.sleep(min(5, max(0, deadline - time.monotonic())))
+          else:
+              raise SystemExit("Demo health check failed after 15 minutes")
+          PYTHON

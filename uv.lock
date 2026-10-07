@@ -1446,6 +1446,7 @@ ui = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "httpx" },
     { name = "modal" },
 ]
 
@@ -1474,7 +1475,10 @@ requires-dist = [
 provides-extras = ["serving", "ui", "presentation", "training"]
 
 [package.metadata.requires-dev]
-dev = [{ name = "modal", specifier = ">=1.5.5" }]
+dev = [
+    { name = "httpx", specifier = ">=0.28.1" },
+    { name = "modal", specifier = ">=1.5.5" },
+]
 
 [[package]]
 name = "mlflow"

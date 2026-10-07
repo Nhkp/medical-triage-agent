@@ -115,6 +115,8 @@ def test_dry_run_validates_env_without_calling_subprocess(
     output = capsys.readouterr().out
     assert "modal secret create hf-token --from-json" in output
     assert "modal deploy deploy/modal_app.py" in output
+    assert "hf_x" not in output
+    assert "triage_x" not in output
 
 
 def _load_script() -> Any:

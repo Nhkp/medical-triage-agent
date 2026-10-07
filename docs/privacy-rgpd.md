@@ -22,3 +22,18 @@ the planned upgrade if the lightweight scanner misses meaningful personal-data p
 
 Audit records may contain hashed request content, triage level, source/model metadata, and
 timestamps. Audit APIs must not return raw patient text.
+
+## Repository credential review — 2026-10-07
+
+The review inspected 650 named Git objects across all locally available refs for long
+Hugging Face token literals, credential assignments, and private-key headers. No matching
+secret was found in that history. The current working files are checked separately before
+handoff. Pattern checks do not prove that every possible credential format is absent or
+that a remote-only ref is clean. `.env`, generated data, and presentation exports are
+ignored by Git; `.env.example` keeps credential values empty.
+
+The local HF/API token values were exposed during an earlier terminal inspection.
+The account owner must revoke and replace `HF_TOKEN` and `TRIAGE_API_TOKEN`, update local
+`.env` and GitHub Actions secrets, then redeploy to refresh the named Modal secrets.
+Do not reuse the exposed values in GitHub. Rotation has not been performed by this agent.
+No history rewrite is indicated by the current findings.

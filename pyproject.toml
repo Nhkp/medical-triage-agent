@@ -40,6 +40,10 @@ training = [
 python_version = "3.12"
 strict = true
 
+[[tool.mypy.overrides]]
+module = ["mlflow", "mlflow.*"]
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
@@ -53,5 +57,6 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
+    "httpx>=0.28.1",
     "modal>=1.5.5",
 ]

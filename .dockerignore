@@ -4,6 +4,13 @@
 data
 models
 checkpoints
+outputs
+dist
+mlruns
+runs
+wandb
+kaggle
+*.db
 .cache
 .pytest_cache
 .mypy_cache
