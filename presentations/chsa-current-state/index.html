@@ -22,8 +22,8 @@
           <span>Clinician review</span>
         </div>
         <div class="metrics">
-          <span>5,000 SFT records</span>
-          <span>1,000 DPO pairs</span>
+          <span>8,000 SFT records</span>
+          <span>2,000 DPO pairs</span>
           <span>Human-in-the-loop</span>
         </div>
         <aside class="notes">
@@ -119,12 +119,12 @@
         <p class="eyebrow">Step 1 · Data milestone</p>
         <h2>The bilingual training dataset is technically complete</h2>
         <div class="big-grid">
-          <div><strong>5,000</strong><span>SFT instruction-response records</span></div>
-          <div><strong>1,000</strong><span>DPO preference pairs</span></div>
-          <div><strong>2,594</strong><span>French records</span></div>
-          <div><strong>3,406</strong><span>English records</span></div>
+          <div><strong>8,000</strong><span>SFT instruction-response records</span></div>
+          <div><strong>2,000</strong><span>DPO preference pairs</span></div>
+          <div><strong>4,545</strong><span>French records</span></div>
+          <div><strong>5,455</strong><span>English records</span></div>
         </div>
-        <p class="caption">Published privately on Hugging Face with manifest and dataset card.</p>
+        <p class="caption">8k extends the requested ~5k corpus; 5k remains historical. Hub publication not reverified.</p>
         <aside class="notes">Use docs/report.md counts; do not claim clinician validation.</aside>
       </section>
 
@@ -138,20 +138,21 @@
           <tr><td>MedQuad</td><td>EN</td><td>SFT</td><td>verified · Apache-2.0</td></tr>
           <tr><td>UltraMedical-Preference</td><td>EN</td><td>DPO</td><td>verified · MIT</td></tr>
         </table>
-        <aside class="notes">Emphasize public data, not CHSA hospital data.</aside>
+        <aside class="notes">8k source counts: MediQAl 3,951; FrenchMedMCQA 594; MedQuad 3,455; UltraMedical 2,000.
+          Splits and SHA-256 hashes are recorded in docs/report.md.</aside>
       </section>
 
       <section class="slide" data-slide-title="Privacy and Audit Evidence">
         <p class="eyebrow">Privacy and RGPD-minded controls</p>
-        <h2>Automated data audit passed before publication</h2>
+        <h2>Automated audit passed on the local 8k dataset</h2>
         <div class="big-grid three">
           <div><strong>0</strong><span>PII findings</span></div>
           <div><strong>0</strong><span>duplicates</span></div>
           <div><strong>0</strong><span>missing provenance</span></div>
         </div>
         <p class="caption">
-          Rejected rows are documented: MediQAl 763, FrenchMedMCQA 1, MedQuad 53,
-          UltraMedical-Preference 2.
+          Rejected rows are documented: MediQAl 1,018, FrenchMedMCQA 1, MedQuad 54,
+          UltraMedical-Preference 8.
         </p>
         <aside class="notes">Automated privacy evidence is necessary but not sufficient.</aside>
       </section>
@@ -170,10 +171,13 @@
           </div>
         </div>
         <p class="lede">
-          The clinician-review queue contains 5,000 records because public QA/preference data is
-          not clinician-validated CHSA triage labeling.
+          Technical validation performed; professional clinical validation not performed. The 8,000-record
+          review queue prepares future review. Clinically validated DPO pairs remain an explicit
+          gap in this school submission.
         </p>
-        <aside class="notes">Do not bury this. It is a release blocker before pilot exposure.</aside>
+        <p class="caption">School review: provenance · FR/EN consistency · red flags · uncertainty · human decision.</p>
+        <aside class="notes">Pedagogical grid: provenance, FR/EN consistency, red flags, uncertainty, human decision.
+          Professional review is a clinical-pilot gate, not an extra school implementation task.</aside>
       </section>
 
       <section class="slide" data-slide-title="Step 2: Low-VRAM Training Path">
@@ -205,7 +209,8 @@
           <span>Latency p50 / p95</span>
           <span>Traceability completeness</span>
         </div>
-        <p class="caption">Automatic metrics remain technical indicators until clinicians validate thresholds.</p>
+        <p class="caption">48 paired bilingual cases; 3 passes/model; separate model and backend metrics.
+          Kaggle GPU results and 144 first-pass reviews pending; checkpoint metrics stay in the report.</p>
         <aside class="notes">Ground in docs/evaluation.md and scripts/evaluate*.py.</aside>
       </section>
 
@@ -236,8 +241,8 @@
           <code>make presentation-pptx</code>
         </div>
         <p class="caption">
-          GitHub Actions runs the check gate; the deploy workflow builds the API image and
-          validates Docker Compose.
+          Manual GitHub Actions: checks → Docker/Compose → Modal → /health (15-minute limit).
+          A successful live run remains to be recorded.
         </p>
         <aside class="notes">This is about repeatability and auditability, not just code volume.</aside>
       </section>
@@ -248,12 +253,12 @@
         <ol>
           <li>Finish SFT/DPO adapter publication and model-backed evaluation.</li>
           <li>Run vLLM + FastAPI validation on a GPU serving runtime.</li>
-          <li>Complete clinician review of evaluation prompts and thresholds.</li>
+          <li>Document school review criteria; obtain professional review before a clinical pilot.</li>
           <li>Decide pilot exposure only after safety, audit and latency gates pass.</li>
         </ol>
         <p class="subtitle">
           Current status: data milestone complete; training and serving paths are reproducible;
-          clinical validation remains pending.
+          professional clinical validation remains outside the completed technical validation.
         </p>
       </section>
     </main>

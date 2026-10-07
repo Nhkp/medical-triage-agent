@@ -70,18 +70,17 @@ def test_kaggle_model_comparison_notebook_references_models_and_outputs() -> Non
     for expected in (
         "scripts/evaluate_model_comparison.py",
         "Qwen/Qwen3-1.7B-Base",
-        "Lokhidor/medical-triage-qwen3-sft-lora",
-        "Lokhidor/medical-triage-qwen3-dpo-lora",
-        "model_comparison_base.json",
-        "model_comparison_sft.json",
-        "model_comparison_dpo.json",
-        "model_comparison_summary.csv",
-        "outputs-evaluations-model-comparison.zip",
+        "comparison.DEFAULT_MODELS",
+        "snapshot_download",
+        "adapter_revision",
+        "manifest.json",
+        "model_comparison_",
+        "summarize_campaign",
+        "zipfile.ZipFile",
     ):
         assert expected in source
 
-    text = path.read_text(encoding="utf-8")
-    assert "structured JSON constraints" in text
+    assert "not clinical validation" in path.read_text(encoding="utf-8")
     assert "hf_" not in source
     assert "HF_TOKEN =" not in source
 

@@ -79,8 +79,24 @@ make data-audit
 make data-summary
 ```
 
-The current step-1 local generation produced `5,000` SFT records and `1,000` DPO records under
-`data/processed/training`; those generated artifacts are intentionally ignored by git.
+The main experiment contains `8,000` SFT records and `2,000` DPO pairs, extending the
+approximately 5,000 SFT examples requested for the school project. The local manifest
+(`2026-08-20T10:48:52Z`) records `5,455` English and `4,545` French examples. Sources,
+splits, SHA-256 hashes, and separate 5k/8k training metrics are recorded in
+[`docs/report.md`](docs/report.md). Generated artifacts are ignored by git.
+
+The 5k/1k experiment remains historical. `make data-ready` retains those defaults and can
+overwrite the current local 8k artifacts. Use the separate published-data workflows:
+
+```bash
+make data-pull-8k
+make data-audit-8k
+make train-8k
+# Historical experiment: data-pull-5k, data-audit-5k, train-5k.
+```
+
+Hub IDs are configured for both experiments; current 8k publication availability and
+visibility have not been verified from the available local evidence.
 
 Remove generated training-data artifacts:
 
@@ -142,14 +158,34 @@ make train-grpo-smoke
 make eval-models
 ```
 
+## Model comparison on Kaggle
+
+The existing [comparison notebook](notebooks/kaggle_model_comparison.ipynb) evaluates
+Base/SFT-8k/DPO-8k sequentially on 48 synthetic bilingual cases, with pinned snapshots,
+three measured passes and separate model/backend indicators. Run
+`make eval-model-comparison-dry-run` locally; use Kaggle for GPU execution. See
+[the evaluation protocol](docs/evaluation.md) for credentials, campaign exports and the
+pedagogical review grid. Real GPU measurements and reviewed conclusions remain pending.
+
+## Demonstration deployment
+
+The `deploy-demo` GitHub Actions workflow runs checks, builds Docker, validates Compose,
+deploys to Modal on manual launch, and polls `/health` for up to fifteen minutes.
+Configure the four GitHub secrets and the `MODAL_URL` variable described in
+[`docs/modal-deployment.md`](docs/modal-deployment.md). `make deploy` remains available locally.
+A successful live workflow and endpoint check are still required as deployment evidence.
+
 ## Limitations
 
 This repository does not contain private hospital data, clinician-validated CHSA triage labels,
 trained model checkpoints, production audit logs, or deployment credentials. Generated datasets,
 model artifacts, Hugging Face caches, and audit outputs must stay outside git.
 
-Clinical validation is represented by documentation, safety tests, and a review queue. It is
-not completed clinician sign-off. Any demo output must remain human-reviewed and must preserve
+Technical validation has been performed through local audits and safety/API tests;
+professional clinical validation has not been performed. The review queue is preparation
+for future professional review. This is a documented limitation of the school submission,
+including an explicit gap against the requested clinically validated DPO pairs, and a gate
+before any clinical pilot. The pedagogical review grid is in `docs/report.md`. Any demo output must remain human-reviewed and must preserve
 uncertainty, escalation rules, and safety disclaimers.
 
 ## Repository Map

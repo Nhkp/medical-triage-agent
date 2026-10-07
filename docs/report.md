@@ -4,7 +4,52 @@
 
 TODO: summarize the final POC results, clinical value, and limits.
 
-## Dataset preparation
+## Main experiment: 8k dataset
+
+The main school submission uses `8,000` SFT records and `2,000` DPO pairs. This extends
+the approximately 5,000 SFT examples requested in `input/step_1.md`; the initial 5k
+experiment remains documented below with its own results.
+
+Evidence: `data/processed/training/manifest.json` and `audit_report.json`, generated at
+`2026-08-20T10:48:52Z`. These local artifacts are ignored by git.
+
+- Languages: `5,455` English and `4,545` French records, counting SFT and DPO together.
+- Sources: MediQAl `3,951`, FrenchMedMCQA `594`, MedQuad `3,455`,
+  UltraMedical-Preference `2,000`.
+- Rejected rows: MediQAl `1,018`, FrenchMedMCQA `1`, MedQuad `54`,
+  UltraMedical-Preference `8`.
+- Automated audit passed: `0` PII, duplicate, and missing-provenance findings.
+- Review queue: `8,000` records requiring professional review before clinical use.
+
+| kind | train | validation | test | clinical_eval |
+| --- | ---: | ---: | ---: | ---: |
+| SFT | 6,361 | 809 | 589 | 241 |
+| DPO | 1,588 | 215 | 137 | 60 |
+
+SHA-256 content hashes from the 8k manifest:
+
+| file group | train | validation | test | clinical_eval |
+| --- | --- | --- | --- | --- |
+| SFT | `2e53258d7932e872dfab53607d7835782197c9c822b72e5f85475c8f2c7ffb37` | `d40444ba13d1ed46f0446945cc115eb567d46d7ef7a9cca8ce4dbb9826ce1646` | `3b000fe46a10b872daf47dc5656a2cab16c156e44ea0cf448d9cdfee7f3acb11` | `d329f2c88fa0776ac02b0a8fc199eefa2e8da107a557e1258c711867f79311bb` |
+| DPO | `86b2b252b66767f01c130679fdeb20a59464c10e1096eb1f297ddef00a510b07` | `15c011716b29bc6410f1175d6d15d64ae84fdcf98ca4b87370a325ca2b25ed56` | `2f2f65ab2332fe5f76eab18a709673d329d6db20bb8ad9da3b1679bc2cc4c135` | `ccbbb08bd1734918507de882816ac7ae71c9059d6c2f3db6353d5df85836381d` |
+
+8k Hub references configured in the Makefile and Modal app:
+
+- Dataset: `Lokhidor/medical-triage-dataset-8k`.
+- SFT: `Lokhidor/medical-triage-qwen3-sft-lora-8k`.
+- DPO: `Lokhidor/medical-triage-qwen3-dpo-lora-8k`.
+- The Modal configuration records adapter revision
+  `9f1c83f91064a8b464bc9e8b87f91231c617b2e7`; this is a configured reference,
+  not evidence that the live Hub publication was verified during this review.
+- Local adapters and checkpoint logs exist under `outputs/experiments/dataset-8k`.
+  The available local evidence does not establish current Hub availability or visibility.
+
+Reproduce the published-data workflows with `make data-pull-8k`, `make data-audit-8k`,
+and `make train-8k`; use the equivalent `*-5k` commands for the historical experiment.
+`make data-ready` retains its historical 5k/1k defaults and can overwrite the local
+`data/processed/training` folder; it does not reproduce the current 8k snapshot by default.
+
+## Historical experiment: 5k dataset preparation
 
 Current status: completed locally for the POC technical milestone.
 
@@ -15,7 +60,7 @@ Current status: completed locally for the POC technical milestone.
 - FrenchMedMCQA is manually verified by the project owner as `apache-2.0`.
 - MedQuAD is manually verified by the project owner as `apache-2.0`.
 
-Generated local artifacts:
+Historical artifacts recorded in the original report (the current local folder is 8k):
 
 - Generation timestamp: `2026-08-05T17:59:36Z`.
 - Output folder: `data/processed/training`.
@@ -49,7 +94,7 @@ Clinical review queue:
   CHSA triage-labeled data.
 - This queue is evidence of validation debt, not completed clinician sign-off.
 
-Hugging Face publication:
+Historical Hugging Face publication recorded in the original report (not reverified live):
 
 - Private dataset publication completed on Hugging Face:
   `https://huggingface.co/datasets/Lokhidor/medical-triage-dataset`.
@@ -68,9 +113,29 @@ make data-ready
 Generated artifacts are written under `data/processed/training` and are intentionally not
 committed to git.
 
-## Training
+## Main experiment: 8k training evidence
 
-Current status: completed for the Step 2 technical milestone.
+These validation metrics come from the final one-epoch local checkpoint logs, not from
+the historical Colab 5k run or a new model-comparison evaluation.
+
+| metric | SFT, step 398 | DPO, step 99 |
+| --- | ---: | ---: |
+| eval loss | `2.615474` | `0.558291` |
+| eval mean token accuracy | `0.711297` | `0.707596` |
+| eval rewards accuracy | — | `0.724299` |
+| eval rewards margin | — | `0.531351` |
+
+Evidence: `outputs/experiments/dataset-8k/sft/checkpoint-398/trainer_state.json` and
+`outputs/experiments/dataset-8k/dpo/checkpoint-99/trainer_state.json`. Adapter directories
+are `outputs/experiments/dataset-8k/sft` and `outputs/experiments/dataset-8k/dpo`;
+these paths do not prove that the final adapters match a published Hub revision.
+The five-step smoke checkpoints are excluded. These indicators do not establish
+clinical safety or comparability across different datasets and training settings.
+
+## Historical experiment: 5k training
+
+Historical status: completed for the initial 5k Step 2 technical milestone. The following
+metrics belong to that run and its original, unsuffixed adapter repositories.
 
 - The SFT and DPO full runs were executed from the Colab/T4 training notebook.
 - Training used the Kaggle/Colab-oriented 4-bit QLoRA path with Qwen3-1.7B-Base, LoRA
@@ -78,7 +143,7 @@ Current status: completed for the Step 2 technical milestone.
 - CPU-safe smoke commands remain available for startup validation, but the recorded metrics
   below come from full 1-epoch GPU runs.
 
-Published adapter repositories:
+Historical adapter publication references recorded in the original report:
 
 - SFT adapter: <https://huggingface.co/Lokhidor/medical-triage-qwen3-sft-lora>
 - DPO adapter: <https://huggingface.co/Lokhidor/medical-triage-qwen3-dpo-lora>
@@ -141,7 +206,7 @@ uv run python -m medical_triage_agent evaluate-safety
 
 Current model-backed evaluation status:
 
-- Training losses and preference metrics are recorded from the Colab full runs.
+- Historical 5k Colab metrics and main 8k checkpoint metrics are reported separately above.
 - Base vs SFT vs DPO deterministic generation evaluation remains to be run against the
   published adapters.
 - Clinical safety, hallucination, bilingual quality, latency, and traceability metrics must be
@@ -155,15 +220,18 @@ make eval-models
 
 Model calibration comparison:
 
-- `notebooks/kaggle_model_comparison.ipynb` compares base, SFT, and DPO serving behavior on a
-  curated bilingual triage-calibration fixture.
-- vLLM structured JSON output is requested before parser repair, so malformed schemas such as
-  `{lng: ...}` are treated as model failures rather than normal output.
-- The comparison reports format acceptance, benign over-escalation, red-flag recall,
-  priority mismatch, repeated output, and latency under `outputs/evaluations/`.
-- If DPO over-escalates benign symptoms more than SFT while preserving no clear safety gain,
-  the demo should prefer SFT and keep DPO experimental until retrained with triage-specific
-  preference pairs.
+- The Kaggle notebook now prepares a pinned Base/SFT-8k/DPO-8k campaign with 48 paired
+  synthetic cases, two warmups and three measured passes per model.
+- The evaluator checks served identity and separately reports usable model suggestions
+  before arbitration and system outcomes after backend rules. The prompt supplies rule
+  priority, so these are POC-context indicators rather than independent clinical reasoning.
+- Dated campaign exports include provenance, per-language metrics, errors/fallbacks,
+  nearest-rank p50/p95 latency, response stability and a pedagogical review grid.
+- The local normalized overlap check passed against both current 8k training splits.
+- Real GPU measurements, the 144 first-pass review rows and model recommendation remain
+  pending: no Kaggle session or returned campaign artifacts are available locally.
+- See `docs/evaluation.md` for setup, resume/export steps, rubric and conditional selection.
+  Training loss metrics and in-process fallback timing do not replace these campaign results.
 
 ## Deployment
 
@@ -172,6 +240,12 @@ Current API supports LLM-assisted triage suggestions through a vLLM-compatible c
 structured priority suggestion, explanation, and confidence; the FastAPI wrapper keeps final
 authority by applying a conservative rule-based safety floor before returning the final priority.
 This is not autonomous triage and still requires clinician review.
+
+The `deploy-demo` GitHub Actions workflow is manually triggered. It runs the base quality
+gate, Docker build and Compose validation before deploying the existing Modal app, then
+polls `/health` for at most fifteen minutes. See `docs/modal-deployment.md` for secrets
+and URL configuration. A successful live Actions run and endpoint probe have not yet
+been recorded for this workflow; implementation alone is not deployment evidence.
 
 Step 3 local deployment status:
 
@@ -188,6 +262,30 @@ Step 3 local deployment status:
 Current limitation: vLLM plus FastAPI still needs to be tested on Colab/T4 or another GPU
 runtime with the published DPO adapter. Local non-vLLM serving and in-process fallback metrics
 are useful smoke evidence, but they are not the final model-backed latency/robustness result.
+
+## School submission and professional clinical validation
+
+Technical validation has been performed through dataset audits and local safety/API checks.
+Professional clinical validation has not been performed. Public medical QA/preference data,
+automated tests, and a review queue do not constitute clinician sign-off.
+
+This is an explicit gap against the request for clinically validated DPO pairs in
+`input/step_1.md`. For this school submission, it is a documented limitation and a future
+clinical-pilot gate, rather than an additional implementation task requiring a clinical panel.
+This does not establish that the grading requirement is fully satisfied.
+
+Pedagogical review grid (criteria, not a claim that professional review occurred):
+
+| criterion | evidence to inspect |
+| --- | --- |
+| Provenance | source IDs, license, transform history and split isolation |
+| French/English consistency | equivalent symptoms retain coherent intent and priority |
+| Red flags | severe symptoms escalate to immediate human attention |
+| Uncertainty | limitations and confidence remain visible |
+| Human decision | no autonomous diagnosis, prescription or discharge |
+
+Final model-backed comparisons and GPU latency/robustness measurements remain separate
+pending work. Do not substitute local fallback results for those measurements.
 
 ## Roadmap
 

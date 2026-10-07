@@ -38,6 +38,8 @@ PRESENTATION_OUT ?= dist/presentations/chsa-current-state.pptx
 
 # Optional API URL used by evaluation targets when testing a running service.
 API_URL ?=
+EVAL_MODEL ?= base
+EVAL_CAMPAIGN ?= outputs/evaluations
 
 .PHONY: sync sync-training sync-ui sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean data-pull-5k data-pull-8k data-audit-5k data-audit-8k data-summary-5k data-summary-8k train-sft-smoke train-dpo-smoke train-grpo-smoke train-5k train-8k pipeline-5k pipeline-8k pipeline-all mlflow-ui deploy deploy-dry-run eval-models eval-model-comparison-dry-run eval-model-comparison serve-local serve-api serve-ui serve-colab-dry-run serve-kaggle-dry-run eval-latency eval-robustness step3-ready presentation-browser presentation-html presentation-pptx presentation-ready clean
 
@@ -184,7 +186,7 @@ eval-model-comparison-dry-run:
 
 # Run model comparison against API_URL when provided, otherwise use the script default.
 eval-model-comparison:
-	uv run python scripts/evaluate_model_comparison.py $(if $(API_URL),--url $(API_URL),)
+	uv run python scripts/evaluate_model_comparison.py --models "$(EVAL_MODEL)" --manifest "$(EVAL_CAMPAIGN)/manifest.json" --output-dir "$(EVAL_CAMPAIGN)" $(if $(API_URL),--url "$(API_URL)",)
 
 # Start the GPU Docker Compose stack for local vLLM plus FastAPI serving.
 serve-local:
