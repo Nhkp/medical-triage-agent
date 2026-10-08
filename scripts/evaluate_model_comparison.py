@@ -285,8 +285,8 @@ def validate_manifest(manifest: dict[str, Any], dataset: Path) -> None:
         raise ValueError("Manifest requires code and training split hashes")
     generation = manifest.get("generation", {})
     max_tokens = generation.get("max_tokens")
-    if type(max_tokens) is not int or max_tokens <= 0:
-        raise ValueError("Campaign max_tokens must be a positive integer")
+    if type(max_tokens) is not int or max_tokens != 256:
+        raise ValueError("Campaign max_tokens must be exactly 256")
     if any(
         generation.get(key) != expected
         for key, expected in {
@@ -402,7 +402,7 @@ def prepare_adapter_compatibility(
 def preflight_model(
     base_url: str, cases: list[CalibrationCase], metadata: dict[str, Any], server_log: Path
 ) -> dict[str, Any]:
-    """Six technical probes; safety rejection is evidence, not a format failure."""
+    """Keep capped generations as model failures; block serving/configuration errors."""
 
     from medical_triage_agent.triage import assess_triage
     from medical_triage_agent.vllm_client import build_chat_request, extract_triage_generation
@@ -424,10 +424,12 @@ def preflight_model(
             raw = _post_json(metadata["vllm_url"].rstrip("/") + "/chat/completions", request)
             result = extract_triage_generation(raw)
             row = {"id": case.id, **asdict(result)}
+            row["output_complete"] = (
+                result.raw_schema_valid is True and result.finish_reason == "stop"
+            )
+            row["length_limited"] = result.finish_reason == "length"
             row["passed"] = (
-                result.raw_schema_valid is True
-                and result.finish_reason is not None
-                and result.finish_reason == "stop"
+                (row["output_complete"] or row["length_limited"])
                 and result.completion_tokens is not None
                 and result.completion_tokens <= request["max_tokens"]
             )
@@ -458,6 +460,8 @@ def preflight_model(
         and not tokenizer_warning
         and compatibility_ok,
         "cases": rows,
+        "length_limited_case_count": sum(row.get("length_limited", False) for row in rows),
+        "length_policy": "record_as_model_failure",
         "ignored_json_parameter_warning": ignored,
         "tokenizer_warning": tokenizer_warning,
         "tokenizer_warning_line_numbers": tokenizer_warning_lines,
@@ -634,7 +638,7 @@ def comparison_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "format_acceptance_rate": _ratio(r["llm_status"] in ACCEPTED for r in rows),
         "format_repair_rate": _ratio(r["llm_status"] == "accepted_repaired" for r in rows),
         "malformed_schema_rate": _ratio(
-            r["llm_status"] in {"bad_response", "invalid_output"} for r in rows
+            r["llm_status"] in {"bad_response", "invalid_output", "truncated_output"} for r in rows
         ),
         "fallback_rate": _ratio(r.get("explanation_source") != "llm" for r in rows),
         "repetition_rate": _ratio(r["raw_preview_repeated"] for r in rows),

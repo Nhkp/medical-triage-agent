@@ -36,3 +36,12 @@ adapter tokenizer configurations and require token/prompt equivalence before ser
 Technical preflight failures block measurements; medical inadequacy stays in the evidence.
 Separate input `language` from review `language_quality` and repair historical reviews in a
 new output directory. Corrected performance and conclusions depend on a returned Kaggle archive.
+
+## Revised truncation policy — user instruction
+
+Fix the comparison ceiling at 256 generated tokens for every model. Treat
+`finish_reason=length` as an observed model failure rather than a preflight blocker.
+Keep the incomplete output and generation metadata in evaluation denominators, use
+the existing rule fallback, and do not fabricate a completed JSON answer. Technical
+configuration and transport failures still block qualification. Preserve earlier
+campaigns and record the changed policy in a new manifest.

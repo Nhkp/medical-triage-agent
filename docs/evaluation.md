@@ -46,8 +46,10 @@ records; it cannot establish absence of semantic contamination.
 
 Each model runs alone: identity is checked against `/health` and vLLM's `/v1/models`,
 six technical probes first cover runny nose, chest pain and dosage requests in both languages.
-They require complete schema-valid JSON, `finish_reason=stop`, completion-token counts,
-and no ignored-JSON-parameter or tokenizer-fallback warning in the local server log.
+They require generation metadata, no token-ceiling violation, and no ignored-JSON-parameter
+or tokenizer-fallback warning in the local server log. Complete outputs must match the JSON
+schema. Outputs with `finish_reason=length` are retained as model failures and do not block
+the campaign; their `output_complete` flag stays false.
 A safety rejection is retained in the preflight report without blocking on medical quality.
 A technical failure blocks all measured requests. After success, two requests warm the
 service, then three passes produce 144 measured requests per model.
@@ -180,21 +182,34 @@ secret. The notebook rejects resuming the initial serving configuration. Its exp
 includes preflight reports even on failure. Corrected GPU results, 144 first-pass reviews,
 comparison with the initial campaign and final model selection remain pending artifact return.
 
-### Qualifying a different token ceiling
+### Fixed 256-token ceiling and truncated generations
 
 The 20261008T082219Z-8k Base preflight stopped three of six probes at 256 tokens,
 leaving incomplete JSON. This is a technical qualification failure, not a model score.
 The tokenizer warning still requires inspecting the referenced local log lines.
 
-Keep the client default of 256 tokens. For a new qualification, set `MAX_TOKENS=512`
-in the notebook's preparation cell and leave `CAMPAIGN_DIR=None`. The chosen ceiling
-is recorded in the manifest, applied to the probes and all three models, and checked
-against effective client settings. This protocol change must be reported when comparing
-campaigns; it changes allowable output length and may affect latency and output quality.
-512 tokens is a candidate ceiling, not evidence that the probes will succeed. Do not
-remove format or tokenizer gates, modify expectations, or retry individual cases with
-higher limits. Keep failed preflight exports as evidence and use the same ceiling for
-all measured passes once technical qualification succeeds.
+Following the user's revised protocol, the campaign ceiling is fixed at **256 tokens**
+for Base, SFT and DPO. Keep `MAX_TOKENS=256` and `CAMPAIGN_DIR=None` for the new run.
+The manifest rejects other ceilings. The shared client validates the positive-integer
+configuration and clamps requested values above 256 to 256; smaller limits remain possible
+outside this fixed comparison protocol. vLLM bounds generation in tokens with `max_tokens=256`: it
+already stops the response at the ceiling and reports `finish_reason=length`. Cutting
+characters or words is not a valid substitute for tokenizer-based token limits.
+
+A length-limited generation has status `truncated_output`, is not accepted as a complete
+model answer and uses the existing rule fallback. Its original redacted preview, finish
+reason, token count and JSON/schema validity remain in audit and reports. No closing JSON
+fields, confidence score or missing explanation are fabricated. This status also applies
+when JSON happens to close at the limit, since completion was not confirmed by the server.
+These failures remain in acceptance, recall, fallback and latency denominators. They cannot
+establish absence of hallucination. Storage-preview truncation remains a separate flag.
+
+Preflight permits this specific bounded-output failure while still blocking transport errors,
+missing generation metadata, excess tokens, invalid complete outputs and tokenizer/schema
+configuration warnings. Medical safety rejection of a complete schema-valid answer remains
+an observation. This explicitly replaces the original requirement that all six triage probes
+finish with complete JSON. The manifest records `length_policy=record_as_model_failure`;
+changed code and protocol require a new campaign, preserving earlier 256/512-token attempts.
 
 Tokenizer warning detection matches whole words so configuration keys such as
 `error_on_recompile` do not masquerade as runtime errors. Preflight reports contain log

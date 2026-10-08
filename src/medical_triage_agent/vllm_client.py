@@ -190,7 +190,7 @@ def build_chat_request(
             },
         ],
         "temperature": 0,
-        "max_tokens": max_tokens,
+        "max_tokens": min(max_tokens, 256),
         "seed": 42,
         "stop": ["具有战士", "具有战士user", "具有战士assistant", "\nuser", "\nassistant"],
     }
@@ -315,8 +315,17 @@ def extract_triage_generation(payload: dict[str, Any]) -> TriageGenerationResult
                 and type(data.get("confidence")) in {int, float}
                 and 0 <= data["confidence"] <= 1
             )
+    result = _extract_triage_content(payload)
+    if finish == "length":
+        result = replace(
+            result,
+            explanation=None,
+            suggested_priority=None,
+            confidence=None,
+            llm_status="truncated_output",
+        )
     return replace(
-        _extract_triage_content(payload),
+        result,
         finish_reason=finish
         if isinstance(finish, str)
         and finish in {"stop", "length", "tool_calls", "content_filter", "function_call"}

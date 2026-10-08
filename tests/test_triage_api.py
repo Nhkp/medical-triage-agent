@@ -890,7 +890,7 @@ def test_generation_configuration_is_validated(monkeypatch: MonkeyPatch) -> None
     monkeypatch.setenv("VLLM_STRUCTURED_OUTPUT", "structured_outputs")
     monkeypatch.setenv("VLLM_MAX_TOKENS", "512")
     request = build_chat_request(payload, response)
-    assert request["max_tokens"] == 512
+    assert request["max_tokens"] == 256
     assert request["seed"] == 42
     assert "structured_outputs" in request
     monkeypatch.setenv("VLLM_STRUCTURED_OUTPUT", "unknown")
@@ -1019,3 +1019,37 @@ def test_invalid_priority_type_keeps_finish_metadata_without_patient_text() -> N
     assert result.finish_reason == "stop" and result.completion_tokens == 12
     payload["choices"][0]["finish_reason"] = "Untrusted patient text"
     assert extract_triage_generation(payload).finish_reason is None
+
+
+def test_length_limited_json_uses_rules_and_preserves_failure_audit(
+    monkeypatch: MonkeyPatch,
+) -> None:
+    from medical_triage_agent import vllm_client
+
+    raw = {
+        "choices": [
+            {
+                "message": {"content": '{"suggested_priority":"moderee","explanation":"unfinished'},
+                "finish_reason": "length",
+            }
+        ],
+        "usage": {"completion_tokens": 256},
+    }
+
+    def remote(request: Any, **kwargs: Any) -> _Response:
+        assert json.loads(request.data)["max_tokens"] == 256
+        return _Response(json.dumps(raw).encode())
+
+    monkeypatch.setenv("VLLM_BASE_URL", "http://vllm.test/v1")
+    monkeypatch.setenv("VLLM_MAX_TOKENS", "256")
+    monkeypatch.setattr(vllm_client, "urlopen", remote)
+    response = api.triage({"symptoms": ["douleur thoracique"]})
+    assert response["priority"] == "urgence_maximale" and response["llm_priority"] == ""
+    assert (
+        response["llm_status"] == "truncated_output"
+        and response["explanation_source"] == "fallback"
+    )
+    record = api.audit(response["audit_id"])
+    assert record is not None and record["finish_reason"] == "length"
+    assert record["completion_tokens"] == 256 and record["raw_schema_valid"] is False
+    assert record["llm_response_preview"] and not record["llm_response_truncated"]

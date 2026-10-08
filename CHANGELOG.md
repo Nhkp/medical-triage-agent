@@ -4,6 +4,11 @@
 
 ### Changed
 
+- Fix the model comparison ceiling at 256 tokens; retain length-limited generations
+  as explicit model failures while permitting the campaign to measure them.
+- Use rule fallback for `truncated_output` and preserve raw format and generation
+  metadata without fabricating a completed model answer.
+
 - Make the Kaggle token ceiling configurable and shared across manifest, preflight and
   all served models; retain the 256-token default and require new campaigns for changes.
 - Diagnose preflight failures with case IDs and tokenizer log line numbers; avoid matching

@@ -390,13 +390,11 @@ def test_manifest_rejects_mutable_revisions_and_changed_inputs(tmp_path: Path) -
         },
     }
     module.validate_manifest(manifest, dataset)
-    manifest["generation"]["max_tokens"] = 512
-    module.validate_manifest(manifest, dataset)
-    for invalid in (0, -1, "512", True):
+    for invalid in (0, -1, "512", True, 512):
         manifest["generation"]["max_tokens"] = invalid
-        with raises(ValueError, match="positive integer"):
+        with raises(ValueError, match="exactly 256"):
             module.validate_manifest(manifest, dataset)
-    manifest["generation"]["max_tokens"] = 512
+    manifest["generation"]["max_tokens"] = 256
     manifest["models"]["sft"]["adapter_revision"] = "main"
     with raises(ValueError, match="immutable"):
         module.validate_manifest(manifest, dataset)
@@ -518,7 +516,9 @@ def test_preflight_blocks_technical_failures_but_keeps_safety_rejection(
     assert result["passed"] and len(result["cases"]) == 6
     assert all(row["llm_status"] == "invalid_output" for row in result["cases"])
     raw["choices"][0]["finish_reason"] = "length"
-    assert not module.preflight_model("http://api.test", cases, metadata, log)["passed"]
+    limited = module.preflight_model("http://api.test", cases, metadata, log)
+    assert limited["passed"] and limited["length_limited_case_count"] == 6
+    assert all(row["llm_status"] == "truncated_output" for row in limited["cases"])
     raw["choices"][0]["finish_reason"] = "stop"
     log.write_text("WARNING ignored fields: {'guided_json'}\n")
     assert not module.preflight_model("http://api.test", cases, metadata, log)["passed"]
@@ -612,6 +612,7 @@ def test_preflight_records_actual_ceiling_and_pinpoints_tokenizer_warning(
     metadata = {"served_model_id": "base", "vllm_url": "http://vllm.test/v1"}
     monkeypatch.setattr(module, "verify_served_model", lambda *args: None)
     sent = []
+    generated_tokens = 200
 
     def generate(url: str, request: dict[str, Any]) -> dict[str, Any]:
         sent.append(request)
@@ -630,7 +631,7 @@ def test_preflight_records_actual_ceiling_and_pinpoints_tokenizer_warning(
                     "finish_reason": "stop",
                 }
             ],
-            "usage": {"completion_tokens": 300},
+            "usage": {"completion_tokens": generated_tokens},
         }
 
     monkeypatch.setattr(module, "_post_json", generate)
@@ -639,8 +640,8 @@ def test_preflight_records_actual_ceiling_and_pinpoints_tokenizer_warning(
     log.write_text("INFO tokenizer='/cache', error_on_recompile=False\n")
     result = module.preflight_model("http://api.test", cases, metadata, log)
     assert result["passed"] and not result["tokenizer_warning"]
-    assert result["generation"]["max_tokens"] == 512
-    assert len(sent) == 6 and all(request["max_tokens"] == 512 for request in sent)
+    assert result["generation"]["max_tokens"] == 256
+    assert len(sent) == 6 and all(request["max_tokens"] == 256 for request in sent)
     log.write_text(
         "INFO tokenizer='/cache', error_on_recompile=False\nWARNING Falling back to default tokenizer\n"
     )
@@ -652,5 +653,55 @@ def test_preflight_records_actual_ceiling_and_pinpoints_tokenizer_warning(
     ] == [1]
     log.write_text("Tokenizer loaded\n")
     monkeypatch.setenv("VLLM_MAX_TOKENS", "256")
+    generated_tokens = 257
     result = module.preflight_model("http://api.test", cases, metadata, log)
     assert result["generation"]["max_tokens"] == 256 and not result["passed"]
+
+
+def test_preflight_keeps_incomplete_capped_json_as_measured_failure(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_script()
+    cases = module.load_cases(Path("tests/fixtures/triage_calibration.jsonl"))
+    metadata = {"served_model_id": "base", "vllm_url": "http://vllm.test/v1"}
+    monkeypatch.setattr(module, "verify_served_model", lambda *args: None)
+    monkeypatch.setenv("VLLM_MAX_TOKENS", "256")
+    raw: dict[str, Any] = {
+        "choices": [
+            {
+                "message": {"content": '{"suggested_priority":"moderee","explanation":"unfinished'},
+                "finish_reason": "length",
+            }
+        ],
+        "usage": {"completion_tokens": 256},
+    }
+    monkeypatch.setattr(module, "_post_json", lambda *args: raw)
+    log = tmp_path / "vllm.log"
+    log.write_text("Tokenizer loaded\n")
+    result = module.preflight_model("http://api.test", cases, metadata, log)
+    assert result["passed"] and result["length_limited_case_count"] == 6
+    assert all(
+        not row["output_complete"] and row["raw_schema_valid"] is False for row in result["cases"]
+    )
+    assert all(row["llm_status"] == "truncated_output" for row in result["cases"])
+    predictions = []
+    for case, evidence in zip(
+        [c for c in cases if c.pair_id in {"runny_nose", "chest_pain", "dose"}],
+        result["cases"],
+        strict=True,
+    ):
+        response = {
+            "priority": case.expected_priority,
+            "llm_status": "truncated_output",
+            "explanation_source": "fallback",
+            "arbitration": "rule_only",
+        }
+        predictions.append(module._prediction_row(case, response, evidence, 10))
+    metrics = module.comparison_metrics(predictions)
+    assert metrics["request_count"] == 6 and metrics["generation_length_count"] == 6
+    assert metrics["safety_acceptance_rate"] == 0 and metrics["fallback_rate"] == 1
+    assert metrics["system_red_flag_recall"] == 1 and metrics["model_red_flag_recall"] == 0
+    raw["usage"]["completion_tokens"] = 257
+    assert not module.preflight_model("http://api.test", cases, metadata, log)["passed"]
+    del raw["usage"]
+    assert not module.preflight_model("http://api.test", cases, metadata, log)["passed"]
