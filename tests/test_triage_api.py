@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Self
 
-from pytest import MonkeyPatch
+from pytest import MonkeyPatch, mark
 
 from medical_triage_agent import api
 from medical_triage_agent.triage import DISCLAIMER, assess_triage
@@ -645,10 +645,7 @@ def test_vllm_rejects_repeated_explanation_when_deduplication_is_too_short() -> 
         "choices": [
             {
                 "message": {
-                    "content": (
-                        "Reponse: moderee\n\n"
-                        "Explanation: Revue clinique requise. Revue clinique requise."
-                    )
+                    "content": ("Reponse: moderee\n\nExplanation: Revue requise. Revue requise.")
                 }
             }
         ]
@@ -1050,3 +1047,75 @@ def test_length_limited_json_uses_rules_and_preserves_failure_audit(
     assert record is not None and record["finish_reason"] == "length"
     assert record["completion_tokens"] == 256 and record["raw_schema_valid"] is False
     assert record["llm_response_preview"] and not record["llm_response_truncated"]
+
+
+@mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            'La revue "humaine" reste nécessaire. La revue "humaine" reste nécessaire.',
+            'La revue "humaine" reste nécessaire.',
+        ),
+        (
+            "Clinical review remains necessary.  CLINICAL   REVIEW REMAINS NECESSARY.",
+            "Clinical review remains necessary.",
+        ),
+        (
+            (
+                "La revue clinique est nécessaire. La gravité reste incertaine. "
+                "La revue clinique est nécessaire. La gravité reste incertaine. "
+                "Les symptômes déclarés doivent être confirmés."
+            ),
+            (
+                "La revue clinique est nécessaire. La gravité reste incertaine. "
+                "Les symptômes déclarés doivent être confirmés."
+            ),
+        ),
+        (
+            (
+                "La revue clinique est nécessaire. La gravité reste incertaine. "
+                "La revue clinique est nécessaire. Les symptômes doivent être confirmés."
+            ),
+            (
+                "La revue clinique est nécessaire. La gravité reste incertaine. "
+                "Les symptômes doivent être confirmés."
+            ),
+        ),
+    ],
+)
+def test_json_repetition_repair_preserves_fields_and_original_preview(
+    text: str, expected: str
+) -> None:
+    content = json.dumps(
+        {"suggested_priority": "moderee", "explanation": text, "confidence": 0.6},
+        ensure_ascii=False,
+    )
+    result = extract_explanation(
+        {
+            "choices": [{"message": {"content": content}, "finish_reason": "stop"}],
+            "usage": {"completion_tokens": 90},
+        }
+    )
+    assert result.llm_status == "accepted_repaired"
+    assert result.explanation == expected
+    assert result.suggested_priority == "moderee" and result.confidence == 0.6
+    assert result.raw_json_valid and result.raw_schema_valid
+    assert result.llm_response_preview == content
+    assert result.finish_reason == "stop" and result.completion_tokens == 90
+
+
+@mark.parametrize(
+    "text",
+    [
+        "La revue clinique est nécessaire. La revue clinique est nécessaire. Un fragment incomplet",
+        "Revue requise. Revue requise.",
+        "Prenez ce médicament sans avis clinique. Prenez ce médicament sans avis clinique.",
+        "La revue clinique reste nécessaire",  # an unrepaired single fragment
+    ],
+)
+def test_repetition_repair_does_not_accept_unsafe_or_incomplete_text(text: str) -> None:
+    content = json.dumps({"suggested_priority": "moderee", "explanation": text, "confidence": 0.6})
+    assert (
+        extract_explanation({"choices": [{"message": {"content": content}}]}).llm_status
+        == "invalid_output"
+    )

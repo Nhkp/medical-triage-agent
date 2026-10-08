@@ -527,7 +527,7 @@ def _accepted_or_invalid_result(
             llm_response_truncated=truncated,
         )
     explanation, deduplicated = _deduplicate_repeated_sentences(explanation)
-    if not _valid_explanation(explanation):
+    if not _valid_explanation(explanation, allow_single_sentence=deduplicated):
         return TriageGenerationResult(
             explanation=None,
             llm_status="invalid_output",
@@ -597,12 +597,14 @@ def _safe_preview(content: str, limit: int = 1200) -> tuple[str, bool]:
     return redacted[:limit].rstrip(), True
 
 
-def _valid_explanation(explanation: str) -> bool:
+def _valid_explanation(explanation: str, *, allow_single_sentence: bool = False) -> bool:
     """Enforce explanation safety constraints before using model text."""
 
     if not 20 <= len(explanation) <= 800:
         return False
-    if len(_sentences(explanation)) < 2:
+    if len(_sentences(explanation)) < (1 if allow_single_sentence else 2):
+        return False
+    if not explanation.rstrip().endswith((".", "!", "?")):
         return False
     if re.search(r"(.)\1{7,}", explanation):
         return False

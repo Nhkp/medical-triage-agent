@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Accept safe complete single sentences after duplicate removal while preserving original
+  previews and rejecting incomplete generations.
+
 - Simplify the serving prompt and apply repetition penalty 1.1 with the shared 256-token
   ceiling.
 
