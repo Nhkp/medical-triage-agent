@@ -392,3 +392,75 @@ def test_manifest_rejects_mutable_revisions_and_changed_inputs(tmp_path: Path) -
     code.write_text("# changed code\n", encoding="utf-8")
     with raises(ValueError, match="Code differs"):
         module.validate_manifest(manifest, dataset)
+
+
+def test_length_and_unknown_metadata_denominators() -> None:
+    module = _load_script()
+    rows = [_row(False, "moderee", None, "moderee", "rule_only") for _ in range(3)]
+    rows[0].update(finish_reason="length", completion_tokens=256, raw_json_valid=False)
+    rows[1].update(
+        finish_reason="stop", completion_tokens=42, raw_json_valid=True, raw_schema_valid=True
+    )
+    metrics = module.comparison_metrics(rows)
+    assert metrics["generation_metadata_denominator"] == 3
+    assert metrics["generation_metadata_missing_count"] == 1
+    assert metrics["generation_length_count"] == 1
+    assert metrics["generation_length_rate"] == 0.5
+    assert metrics["raw_json_valid_rate"] == 1 / 3
+    assert metrics["safety_acceptance_rate"] == 0
+
+
+def test_legacy_review_repair_separates_language_and_preserves_annotations(tmp_path: Path) -> None:
+    import csv
+
+    module = _load_script()
+    original = tmp_path / "original"
+    original.mkdir()
+    _campaign(module, original)
+    module.summarize_campaign(original)
+    review = original / "pedagogical_review.csv"
+    with review.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    for row in rows:
+        row["language"] = row.pop("language_quality")
+        row["language_reason"] = row.pop("language_quality_reason")
+    rows[0].update(
+        language="conforme",
+        language_reason="French response",
+        dangerous_advice="non évaluable",
+        dangerous_advice_reason="No complete model text",
+    )
+    module.write_summary_csv(review, rows)
+    before = {p.name: module.checksum(p) for p in original.iterdir()}
+    destination = tmp_path / "repaired"
+    module.summarize_campaign(original, destination)
+    module.summarize_campaign(original, destination)
+    assert before == {p.name: module.checksum(p) for p in original.iterdir()}
+    with (destination / "pedagogical_review.csv").open(encoding="utf-8", newline="") as handle:
+        repaired = list(csv.DictReader(handle))
+    assert repaired[0]["language"] == "fr"
+    assert repaired[0]["language_quality"] == "conforme"
+    assert repaired[0]["language_quality_reason"] == "French response"
+    assert repaired[0]["dangerous_advice"] == "non évaluable"
+    assert repaired[1]["language_quality"] == ""
+
+
+def test_length_stopped_review_cannot_prove_absence_of_hallucination(tmp_path: Path) -> None:
+    import csv
+
+    module = _load_script()
+    _campaign(module, tmp_path)
+    path = tmp_path / "model_comparison_base.json"
+    report = json.loads(path.read_text())
+    report["predictions"][0].update(
+        finish_reason="length", llm_response_preview="Partial", llm_response_truncated=False
+    )
+    module._write_json(path, report)
+    module.summarize_campaign(tmp_path)
+    review = tmp_path / "pedagogical_review.csv"
+    with review.open(encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    rows[0].update(invented_information="conforme", invented_information_reason="Looks safe")
+    module.write_summary_csv(review, rows)
+    with raises(ValueError, match="Truncated"):
+        module.summarize_campaign(tmp_path)

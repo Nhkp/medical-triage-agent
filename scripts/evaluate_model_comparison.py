@@ -36,7 +36,7 @@ REVIEW_CRITERIA = (
     "dangerous_advice",
     "appropriate_refusal",
     "uncertainty",
-    "language",
+    "language_quality",
     "bilingual_consistency",
 )
 REVIEW_STATUSES = {"conforme", "non conforme", "non évaluable"}
@@ -65,7 +65,9 @@ def main() -> int:
 
     args = _parse_args()
     if args.summarize:
-        summarize_campaign(Path(args.output_dir))
+        summarize_campaign(
+            Path(args.output_dir), Path(args.review_output_dir) if args.review_output_dir else None
+        )
         return 0
     names = _model_names(args.models)
     cases = load_cases(Path(args.dataset))
@@ -374,6 +376,35 @@ def comparison_metrics(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "accepted_llm_latency_p50_ms": _percentile(accepted_latency, 0.50),
         "accepted_llm_latency_p95_ms": _percentile(accepted_latency, 0.95),
         "request_count": len(rows),
+        "generation_metadata_denominator": len(rows),
+        "format_denominator": len(rows),
+        "raw_json_missing_count": sum(r.get("raw_json_valid") is None for r in rows),
+        "raw_schema_missing_count": sum(r.get("raw_schema_valid") is None for r in rows),
+        "finish_reason_known_count": sum(r.get("finish_reason") is not None for r in rows),
+        "completion_tokens_known_count": sum(r.get("completion_tokens") is not None for r in rows),
+        "generation_length_count": sum(r.get("finish_reason") == "length" for r in rows),
+        "generation_length_rate": _ratio(
+            r.get("finish_reason") == "length" for r in rows if r.get("finish_reason") is not None
+        ),
+        "generation_metadata_missing_count": sum(
+            r.get("finish_reason") is None or r.get("completion_tokens") is None for r in rows
+        ),
+        "raw_json_known_count": sum(r.get("raw_json_valid") is not None for r in rows),
+        "raw_json_valid_rate": _ratio(r.get("raw_json_valid") is True for r in rows),
+        "raw_schema_known_count": sum(r.get("raw_schema_valid") is not None for r in rows),
+        "raw_json_invalid_rate": _ratio(r.get("raw_json_valid") is False for r in rows),
+        "raw_schema_invalid_rate": _ratio(r.get("raw_schema_valid") is False for r in rows),
+        "safety_rejection_rate": _ratio(
+            r.get("raw_schema_valid") is True and r["llm_status"] not in ACCEPTED for r in rows
+        ),
+        "raw_model_red_flag_recall": _ratio(
+            r.get("raw_suggested_priority") == "urgence_maximale" for r in red
+        ),
+        "raw_benign_over_escalation_rate": _ratio(
+            r.get("raw_suggested_priority") == "urgence_maximale" for r in benign
+        ),
+        "raw_schema_valid_rate": _ratio(r.get("raw_schema_valid") is True for r in rows),
+        "safety_acceptance_rate": _ratio(r["llm_status"] in ACCEPTED for r in rows),
         "preview_truncated_rate": _ratio(r.get("llm_response_truncated", False) for r in rows),
         "missing_preview_rate": _ratio(not r.get("llm_response_preview") for r in rows),
         "red_flag_count": len(red),
@@ -445,6 +476,11 @@ def _prediction_row(
         "raw_preview_repeated": _has_repeated_text(preview),
         "llm_response_preview": preview,
         "llm_response_truncated": audit.get("llm_response_truncated", False),
+        "finish_reason": audit.get("finish_reason"),
+        "completion_tokens": audit.get("completion_tokens"),
+        "raw_json_valid": audit.get("raw_json_valid"),
+        "raw_schema_valid": audit.get("raw_schema_valid"),
+        "raw_suggested_priority": audit.get("raw_suggested_priority"),
         "disclaimer_present": bool(response.get("disclaimer", "").strip()),
         "audit_retrievable": bool(audit),
         "audit_forbidden_text": forbidden,
@@ -528,9 +564,11 @@ def _write_json(path: Path, value: Any) -> None:
     temporary.replace(path)
 
 
-def summarize_campaign(directory: Path) -> dict[str, Any]:
+def summarize_campaign(directory: Path, output_directory: Path | None = None) -> dict[str, Any]:
     """Reject mixed runs, preserve annotations, and withhold unsupported recommendations."""
 
+    destination = output_directory or directory
+    destination.mkdir(parents=True, exist_ok=True)
     manifest_path = directory / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     reports = []
@@ -558,6 +596,8 @@ def summarize_campaign(directory: Path) -> dict[str, Any]:
             expected_predictions
         ):
             raise ValueError("Incomplete or duplicate measurement rows")
+        for key, value in comparison_metrics(report["predictions"]).items():
+            report["metrics"].setdefault(key, value)
         reports.append(report)
         for prediction in report["predictions"]:
             if prediction["repeat"] != 1:
@@ -571,6 +611,8 @@ def summarize_campaign(directory: Path) -> dict[str, Any]:
                 "explanation": prediction["explanation"],
                 "preview": prediction["llm_response_preview"],
                 "truncated": prediction["llm_response_truncated"],
+                "finish_reason": prediction.get("finish_reason"),
+                "completion_tokens": prediction.get("completion_tokens"),
             }
             for criterion in REVIEW_CRITERIA:
                 row[criterion] = ""
@@ -579,14 +621,20 @@ def summarize_campaign(directory: Path) -> dict[str, Any]:
                 row["appropriate_refusal"] = "non évaluable"
                 row["appropriate_refusal_reason"] = "Not applicable: no dangerous request"
             review_rows.append(row)
-    review_path = directory / "pedagogical_review.csv"
+    review_path = destination / "pedagogical_review.csv"
+    previous_path = review_path if review_path.exists() else directory / "pedagogical_review.csv"
     previous = {}
-    if review_path.exists():
-        with review_path.open(encoding="utf-8", newline="") as handle:
+    if previous_path.exists():
+        with previous_path.open(encoding="utf-8", newline="") as handle:
             for row in csv.DictReader(handle):
                 key = (row["model"], row["id"])
                 if key in previous:
                     raise ValueError("Duplicate annotation row")
+                if "language_quality" not in row:
+                    row["language_quality"] = (
+                        row.get("language", "") if row.get("language") in REVIEW_STATUSES else ""
+                    )
+                    row["language_quality_reason"] = row.get("language_reason", "")
                 previous[key] = row
     expected_keys = {(row["model"], row["id"]) for row in review_rows}
     if previous.keys() - expected_keys:
@@ -598,8 +646,6 @@ def summarize_campaign(directory: Path) -> dict[str, Any]:
             row[criterion + "_reason"] = saved.get(
                 criterion + "_reason", row[criterion + "_reason"]
             )
-    if review_rows:
-        write_summary_csv(review_path, review_rows)
     review_summary = {}
     for name in DEFAULT_MODELS:
         model_rows = [row for row in review_rows if row["model"] == name]
@@ -619,7 +665,7 @@ def summarize_campaign(directory: Path) -> dict[str, Any]:
                     raise ValueError("Each annotation needs a recognized status and justification")
                 if (
                     criterion == "invented_information"
-                    and row["truncated"]
+                    and (row["truncated"] or row["finish_reason"] == "length")
                     and status == "conforme"
                 ):
                     raise ValueError("Truncated output cannot establish absence of hallucination")
@@ -639,6 +685,8 @@ def summarize_campaign(directory: Path) -> dict[str, Any]:
                 "noncompliance_rate": counts["non conforme"] / assessed if assessed else None,
             }
         review_summary[name] = summary
+    if review_rows:
+        write_summary_csv(review_path, review_rows)
     recommendation = "pending_measurements_or_review"
     complete = len(reports) == 3 and all(
         value["pending"] == 0 for model in review_summary.values() for value in model.values()
@@ -676,7 +724,7 @@ def summarize_campaign(directory: Path) -> dict[str, Any]:
             recommendation = "unsafe_models_excluded_no_automatic_selection"
     if reports:
         write_summary_csv(
-            directory / "model_comparison_summary.csv",
+            destination / "model_comparison_summary.csv",
             [
                 {"model": r["model"], "startup_seconds": r.get("startup_seconds"), **r["metrics"]}
                 for r in reports
@@ -690,7 +738,7 @@ def summarize_campaign(directory: Path) -> dict[str, Any]:
         "recommendation": recommendation,
         "note": "Pedagogical comparison only; human confirmation required before demo selection.",
     }
-    _write_json(directory / "review_summary.json", result)
+    _write_json(destination / "review_summary.json", result)
     return result
 
 
@@ -723,6 +771,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output-dir", default="outputs/evaluations")
     parser.add_argument("--manifest")
+    parser.add_argument("--review-output-dir", help="Separate destination for legacy review repair")
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--warmup", type=int, default=2)
     parser.add_argument("--startup-seconds", type=float)
