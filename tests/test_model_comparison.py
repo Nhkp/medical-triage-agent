@@ -382,7 +382,12 @@ def test_manifest_rejects_mutable_revisions_and_changed_inputs(tmp_path: Path) -
         "training_hashes": {str(training): module.checksum(training)},
         "runtime": {"python": "synthetic"},
         "hardware": "synthetic GPU",
-        "generation": {"seed": 42, "temperature": 0, "max_tokens": 110},
+        "generation": {
+            "seed": 42,
+            "temperature": 0,
+            "max_tokens": 256,
+            "structured_output": "guided_json",
+        },
     }
     module.validate_manifest(manifest, dataset)
     manifest["models"]["sft"]["adapter_revision"] = "main"
@@ -392,6 +397,15 @@ def test_manifest_rejects_mutable_revisions_and_changed_inputs(tmp_path: Path) -
     code.write_text("# changed code\n", encoding="utf-8")
     with raises(ValueError, match="Code differs"):
         module.validate_manifest(manifest, dataset)
+
+
+def test_tokenizer_normalization_preserves_existing_and_source() -> None:
+    module = _load_script()
+    original = {"extra_special_tokens": ["a", "b"], "additional_special_tokens": ["b", "c"]}
+    converted = module.normalize_tokenizer_config(original)
+    assert converted == {"additional_special_tokens": ["b", "c", "a"]}
+    assert original["extra_special_tokens"] == ["a", "b"]
+    assert module.normalize_tokenizer_config(converted) == converted
 
 
 def test_length_and_unknown_metadata_denominators() -> None:
@@ -464,3 +478,120 @@ def test_length_stopped_review_cannot_prove_absence_of_hallucination(tmp_path: P
     module.write_summary_csv(review, rows)
     with raises(ValueError, match="Truncated"):
         module.summarize_campaign(tmp_path)
+
+
+def test_preflight_blocks_technical_failures_but_keeps_safety_rejection(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_script()
+    cases = module.load_cases(Path("tests/fixtures/triage_calibration.jsonl"))
+    metadata = {"served_model_id": "base", "vllm_url": "http://vllm.test/v1"}
+    monkeypatch.setattr(module, "verify_served_model", lambda *args: None)
+    raw: dict[str, Any] = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "suggested_priority": "moderee",
+                            "explanation": "Take aspirin 100 mg.",
+                            "confidence": 0.5,
+                        }
+                    )
+                },
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {"completion_tokens": 25},
+    }
+    monkeypatch.setattr(module, "_post_json", lambda *args: raw)
+    log = tmp_path / "vllm.log"
+    log.write_text("Tokenizer loaded\n")
+    result = module.preflight_model("http://api.test", cases, metadata, log)
+    assert result["passed"] and len(result["cases"]) == 6
+    assert all(row["llm_status"] == "invalid_output" for row in result["cases"])
+    raw["choices"][0]["finish_reason"] = "length"
+    assert not module.preflight_model("http://api.test", cases, metadata, log)["passed"]
+    raw["choices"][0]["finish_reason"] = "stop"
+    log.write_text("WARNING ignored fields: {'guided_json'}\n")
+    assert not module.preflight_model("http://api.test", cases, metadata, log)["passed"]
+    log.write_text("Tokenizer loaded\n")
+    del raw["usage"]
+    assert not module.preflight_model("http://api.test", cases, metadata, log)["passed"]
+
+
+def test_correct_alias_with_wrong_snapshot_is_rejected(monkeypatch: MonkeyPatch) -> None:
+    module = _load_script()
+    metadata = {
+        "served_model_id": "sft-8k",
+        "vllm_url": "http://vllm.test/v1",
+        "adapter_path": "/snapshots/correct",
+    }
+    monkeypatch.setattr(
+        module,
+        "_get_json",
+        lambda url: (
+            {"model": "sft-8k", "vllm": "configured"}
+            if url.endswith("health")
+            else {"data": [{"id": "sft-8k", "root": "/snapshots/wrong"}]}
+        ),
+    )
+    with raises(ValueError, match="snapshot path"):
+        module.verify_served_model("http://api.test", metadata)
+
+
+def test_tokenizer_copy_blocks_changed_encoding_and_preserves_original(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    from types import SimpleNamespace
+
+    module = _load_script()
+    source = tmp_path / "original"
+    source.mkdir()
+    config = {"extra_special_tokens": ["token"], "additional_special_tokens": []}
+    (source / "tokenizer_config.json").write_text(json.dumps(config))
+    (source / "adapter_model.safetensors").write_bytes(b"synthetic weights")
+    original = {p.name: module.checksum(p) for p in source.iterdir()}
+    mismatch = False
+
+    class Tokenizer:
+        all_special_tokens = ("token",)
+        all_special_ids = (0,)
+        bos_token_id = eos_token_id = pad_token_id = unk_token_id = None
+
+        def __init__(self, converted: bool) -> None:
+            self.converted = converted
+
+        def add_special_tokens(self, *args: Any, **kwargs: Any) -> int:
+            return 0
+
+        def get_vocab(self) -> dict[str, int]:
+            return {"token": 0}
+
+        def get_added_vocab(self) -> dict[str, int]:
+            return {"token": 0}
+
+        def apply_chat_template(self, *args: Any, **kwargs: Any) -> list[int]:
+            return [1] if mismatch and self.converted else [0]
+
+    fake = SimpleNamespace(
+        AutoTokenizer=SimpleNamespace(
+            from_pretrained=lambda path, **kwargs: Tokenizer(Path(path) != source)
+        )
+    )
+    monkeypatch.setitem(sys.modules, "transformers", fake)
+    destination = tmp_path / "compatible"
+    cases = module.load_cases(Path("tests/fixtures/triage_calibration.jsonl"))
+    record = module.prepare_adapter_compatibility(source, destination, cases, "template")
+    assert record["equivalence_verified"] and record["prompt_count"] == 48
+    assert original == {p.name: module.checksum(p) for p in source.iterdir()}
+    assert (
+        record["original_hashes"]["adapter_model.safetensors"]
+        == record["corrected_hashes"]["adapter_model.safetensors"]
+    )
+    mismatch = True
+    with raises(ValueError, match="encoding differs"):
+        module.prepare_adapter_compatibility(source, destination, cases, "template")
+    (destination / "adapter_model.safetensors").write_bytes(b"changed")
+    with raises(ValueError, match="other than"):
+        module.prepare_adapter_compatibility(source, destination, cases, "template")

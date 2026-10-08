@@ -17,7 +17,8 @@ prompt includes the rule priority; the experiment does not measure independent c
 Use two warmups and three measured passes. Retain errors and fallback evidence, save completed
 model artifacts atomically, and reject mixed campaigns. Review first-pass text pedagogically
 without another LLM judge. Leave GPU results, annotations and model selection pending until
-Kaggle artifacts are returned. Public API routes and clinical rules remain unchanged.
+Kaggle artifacts are returned. Public API routes remain unchanged. The 2026-10-08 correction adds missing French red-flag
+phrasing without changing fixture expectations.
 
 ## Consequences
 
@@ -25,3 +26,13 @@ Kaggle artifacts are returned. Public API routes and clinical rules remain uncha
 - Local tests verify the evaluator, not model performance or professional clinical safety.
 - A failed or inconclusive campaign cannot be represented as a successful model validation.
 - Changed fingerprints require a new campaign; interrupted models restart from their first case.
+
+## Serving remediation — 2026-10-08
+
+Preserve the initial `20261008T061839Z-8k` campaign. Keep vLLM 0.10.2, Transformers 4.56.2
+and pinned model revisions; use first-call guided JSON and a shared 256-token ceiling.
+Record finish metadata independently of preview storage truncation. Transform only local
+adapter tokenizer configurations and require token/prompt equivalence before serving.
+Technical preflight failures block measurements; medical inadequacy stays in the evidence.
+Separate input `language` from review `language_quality` and repair historical reviews in a
+new output directory. Corrected performance and conclusions depend on a returned Kaggle archive.

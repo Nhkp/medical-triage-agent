@@ -6,8 +6,10 @@ import hashlib
 import json
 import math
 import re
+import shutil
 import statistics
 import subprocess
+import sys
 import time
 import unicodedata
 from dataclasses import asdict, dataclass
@@ -16,6 +18,8 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 from urllib.request import Request, urlopen
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 TRIAGE_ORDER = {"differee": 0, "moderee": 1, "urgence_maximale": 2}
 DEFAULT_DATASET = Path("tests/fixtures/triage_calibration.jsonl")
@@ -106,6 +110,31 @@ def main() -> int:
     output = output_dir / f"model_comparison_{name}.json"
     if output.exists():
         raise ValueError("Result already exists; resume from the notebook or start a new campaign")
+    from medical_triage_agent.triage import assess_triage
+    from medical_triage_agent.vllm_client import build_chat_request
+
+    request = build_chat_request(
+        {"symptoms": ["runny nose"]}, assess_triage({"symptoms": ["runny nose"]})
+    )
+    if (
+        any(
+            request[key] != manifest["generation"][key]
+            for key in ("seed", "temperature", "max_tokens")
+        )
+        or "guided_json" not in request
+    ):
+        raise ValueError("Effective generation differs from manifest")
+    if not args.server_log:
+        raise ValueError(
+            "Preflight requires --server-log to check ignored parameters and tokenizer warnings"
+        )
+    preflight = preflight_model(args.url, cases, metadata, Path(args.server_log))
+    preflight["manifest_checksum"] = checksum(Path(args.manifest))
+    _write_json(output_dir / f"preflight_{name}.json", preflight)
+    if not preflight["passed"]:
+        raise ValueError(
+            "Technical preflight failed; inspect preflight report before any full campaign"
+        )
     result = evaluate_api_model(
         model_name=name,
         base_url=args.url,
@@ -252,11 +281,186 @@ def validate_manifest(manifest: dict[str, Any], dataset: Path) -> None:
     generation = manifest.get("generation", {})
     if any(
         generation.get(key) != expected
-        for key, expected in {"seed": 42, "temperature": 0, "max_tokens": 110}.items()
+        for key, expected in {
+            "seed": 42,
+            "temperature": 0,
+            "max_tokens": 256,
+            "structured_output": "guided_json",
+        }.items()
     ):
         raise ValueError(
             "Campaign requires seed 42 and the shared deterministic generation settings"
         )
+
+
+def normalize_tokenizer_config(config: dict[str, Any]) -> dict[str, Any]:
+    """Convert the legacy list without changing existing special token declarations."""
+
+    normalized = dict(config)
+    extra = normalized.get("extra_special_tokens")
+    if isinstance(extra, list):
+        existing = list(normalized.get("additional_special_tokens", []))
+        for token in extra:
+            if not isinstance(token, str):
+                raise TypeError("Legacy extra_special_tokens must contain strings")
+            if token not in existing:
+                existing.append(token)
+        normalized["additional_special_tokens"] = existing
+        del normalized["extra_special_tokens"]
+    return normalized
+
+
+def prepare_adapter_compatibility(
+    source: Path, destination: Path, cases: list[CalibrationCase], template: str
+) -> dict[str, Any]:
+    """Copy immutable assets and prove tokenizer equivalence before serving a LoRA."""
+
+    from transformers import AutoTokenizer
+
+    from medical_triage_agent.triage import assess_triage
+    from medical_triage_agent.vllm_client import build_chat_request
+
+    if (
+        source.resolve() == destination.resolve()
+        or source.resolve() in destination.resolve().parents
+    ):
+        raise ValueError("Compatibility copy must be outside the original snapshot")
+    original = {str(p.relative_to(source)): checksum(p) for p in source.rglob("*") if p.is_file()}
+    config = json.loads((source / "tokenizer_config.json").read_text())
+    normalized = normalize_tokenizer_config(config)
+    # ponytail: copy existing files; no weight conversion or new model publication.
+    if not destination.exists():
+        shutil.copytree(source, destination)
+        _write_json(destination / "tokenizer_config.json", normalized)
+    if json.loads((destination / "tokenizer_config.json").read_text()) != normalized:
+        raise ValueError("Existing compatibility copy differs from the expected transformation")
+    corrected = {
+        str(p.relative_to(destination)): checksum(p) for p in destination.rglob("*") if p.is_file()
+    }
+    if set(corrected) != set(original) or any(
+        corrected[key] != value for key, value in original.items() if key != "tokenizer_config.json"
+    ):
+        raise ValueError("Compatibility copy changed an asset other than tokenizer_config.json")
+    # The original legacy list cannot load in 4.56.2. Explicitly register its already
+    # present tokens on the reference; adding vocabulary would invalidate equivalence.
+    overrides = (
+        {"extra_special_tokens": {}} if isinstance(config.get("extra_special_tokens"), list) else {}
+    )
+    reference = AutoTokenizer.from_pretrained(str(source), **overrides)
+    legacy = config.get("extra_special_tokens", [])
+    if isinstance(legacy, list) and reference.add_special_tokens(
+        {"additional_special_tokens": legacy}, replace_additional_special_tokens=False
+    ):
+        raise ValueError("Legacy special tokens would change vocabulary")
+    converted = AutoTokenizer.from_pretrained(str(destination))
+    if (
+        reference.get_vocab() != converted.get_vocab()
+        or reference.get_added_vocab() != converted.get_added_vocab()
+        or set(reference.all_special_tokens) != set(converted.all_special_tokens)
+        or set(reference.all_special_ids) != set(converted.all_special_ids)
+        or any(
+            getattr(reference, key) != getattr(converted, key)
+            for key in ("bos_token_id", "eos_token_id", "pad_token_id", "unk_token_id")
+        )
+    ):
+        raise ValueError("Tokenizer vocabulary, IDs or special tokens differ")
+    encodings = []
+    for case in cases:
+        payload = {"symptoms": case.symptoms, "language": case.language}
+        messages = build_chat_request(payload, assess_triage(payload))["messages"]
+        before = reference.apply_chat_template(
+            messages, chat_template=template, tokenize=True, add_generation_prompt=True
+        )
+        after = converted.apply_chat_template(
+            messages, chat_template=template, tokenize=True, add_generation_prompt=True
+        )
+        if before != after:
+            raise ValueError(f"Tokenizer prompt encoding differs: {case.id}")
+        encodings.append({"id": case.id, "token_ids": after})
+    return {
+        "original_path": str(source),
+        "original_hashes": original,
+        "corrected_hashes": corrected,
+        "transformation": "extra_special_tokens list merged into additional_special_tokens",
+        "equivalence_verified": True,
+        "prompt_count": len(encodings),
+        "prompt_encoding_checksum": hashlib.sha256(
+            json.dumps(encodings, sort_keys=True).encode()
+        ).hexdigest(),
+        "tokenizer_class": type(converted).__name__,
+        "vocabulary_size": len(converted.get_vocab()),
+    }
+
+
+def preflight_model(
+    base_url: str, cases: list[CalibrationCase], metadata: dict[str, Any], server_log: Path
+) -> dict[str, Any]:
+    """Six technical probes; safety rejection is evidence, not a format failure."""
+
+    from medical_triage_agent.triage import assess_triage
+    from medical_triage_agent.vllm_client import build_chat_request, extract_triage_generation
+
+    verify_served_model(base_url, metadata)
+    selected = [case for case in cases if case.pair_id in {"runny_nose", "chest_pain", "dose"}]
+    if len(selected) != 6 or {(c.pair_id, c.language) for c in selected} != {
+        (pair, language)
+        for pair in ("runny_nose", "chest_pain", "dose")
+        for language in ("fr", "en")
+    }:
+        raise ValueError("Preflight requires the six paired French/English cases")
+    rows = []
+    for case in selected:
+        payload = {"symptoms": case.symptoms, "language": case.language}
+        request = build_chat_request(payload, assess_triage(payload))
+        request["model"] = metadata["served_model_id"]
+        try:
+            raw = _post_json(metadata["vllm_url"].rstrip("/") + "/chat/completions", request)
+            result = extract_triage_generation(raw)
+            row = {"id": case.id, **asdict(result)}
+            row["passed"] = (
+                result.raw_schema_valid is True
+                and result.finish_reason is not None
+                and result.finish_reason == "stop"
+                and result.completion_tokens is not None
+                and result.completion_tokens <= request["max_tokens"]
+            )
+        except (OSError, ValueError, TypeError, TimeoutError) as exc:
+            row = {"id": case.id, "passed": False, "error": type(exc).__name__}
+        rows.append(row)
+    log = server_log.read_text(encoding="utf-8", errors="replace")
+    ignored = bool(
+        re.search(
+            r"(?im)^.*(?:ignor|not supported).*(?:guided_json|structured_outputs)|^.*(?:guided_json|structured_outputs).*(?:ignor|not supported)",
+            log,
+        )
+    )
+    tokenizer_warning = bool(
+        re.search(
+            r"(?im)^.*tokenizer.*(?:fallback|failed|error)|^.*(?:fallback|failed|error).*tokenizer",
+            log,
+        )
+    )
+    compatibility_ok = (
+        not metadata.get("adapter")
+        or metadata.get("tokenizer_compatibility", {}).get("equivalence_verified") is True
+    )
+    return {
+        "passed": all(row["passed"] for row in rows)
+        and not ignored
+        and not tokenizer_warning
+        and compatibility_ok,
+        "cases": rows,
+        "ignored_json_parameter_warning": ignored,
+        "tokenizer_warning": tokenizer_warning,
+        "tokenizer_equivalence_verified": compatibility_ok,
+        "served_model_id": metadata["served_model_id"],
+        "generation": {
+            "seed": 42,
+            "temperature": 0,
+            "max_tokens": 256,
+            "structured_output": "guided_json",
+        },
+    }
 
 
 def verify_served_model(base_url: str, metadata: dict[str, Any]) -> None:
@@ -267,8 +471,14 @@ def verify_served_model(base_url: str, metadata: dict[str, Any]) -> None:
     if health.get("model") != expected or health.get("vllm") != "configured":
         raise ValueError("Wrong served model or rule-only fallback endpoint")
     listing = _get_json(metadata["vllm_url"].rstrip("/") + "/models")
-    if expected not in {row.get("id") for row in listing.get("data", [])}:
+    card = next((row for row in listing.get("data", []) if row.get("id") == expected), None)
+    if card is None:
         raise ValueError("Expected model is absent from vLLM")
+    expected_path = metadata.get("adapter_path") or metadata.get("base_path")
+    if expected_path and (
+        not card.get("root") or Path(card["root"]).resolve() != Path(expected_path).resolve()
+    ):
+        raise ValueError("Served model snapshot path differs from campaign")
 
 
 def evaluate_api_model(
@@ -771,6 +981,7 @@ def _parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--output-dir", default="outputs/evaluations")
     parser.add_argument("--manifest")
+    parser.add_argument("--server-log")
     parser.add_argument("--review-output-dir", help="Separate destination for legacy review repair")
     parser.add_argument("--repeats", type=int, default=3)
     parser.add_argument("--warmup", type=int, default=2)

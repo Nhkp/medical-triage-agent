@@ -9,6 +9,8 @@
   settings, a 256-token default, and audit metadata for accepted and rejected outputs.
 - Separate input language from review quality, preserve annotations, and export repaired
   historical reviews separately with generation-length and missing-metadata indicators.
+- Prepare immutable adapter compatibility copies with tokenizer equivalence checks
+  and block Kaggle measurement on technical preflight failures.
 
 - Run the quality gate with base development dependencies; keep MLflow and GPU training
   libraries optional.

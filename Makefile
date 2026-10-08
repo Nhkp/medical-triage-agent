@@ -186,7 +186,7 @@ eval-model-comparison-dry-run:
 
 # Run model comparison against API_URL when provided, otherwise use the script default.
 eval-model-comparison:
-	uv run python scripts/evaluate_model_comparison.py --models "$(EVAL_MODEL)" --manifest "$(EVAL_CAMPAIGN)/manifest.json" --output-dir "$(EVAL_CAMPAIGN)" $(if $(API_URL),--url "$(API_URL)",)
+	uv run python scripts/evaluate_model_comparison.py --models "$(EVAL_MODEL)" --server-log "$(EVAL_CAMPAIGN)/$(EVAL_MODEL)-vllm.log" --manifest "$(EVAL_CAMPAIGN)/manifest.json" --output-dir "$(EVAL_CAMPAIGN)" $(if $(API_URL),--url "$(API_URL)",)
 
 # Start the GPU Docker Compose stack for local vLLM plus FastAPI serving.
 serve-local:
