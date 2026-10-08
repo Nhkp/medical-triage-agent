@@ -880,3 +880,14 @@ def test_generate_explanation_reports_connection_error(monkeypatch: MonkeyPatch)
     assert result.explanation is None
     assert result.explanation_source == "fallback"
     assert result.llm_status == "connection_error"
+
+
+def test_french_trauma_and_anaphylaxis_are_protected_without_model() -> None:
+    for symptom in (
+        "traumatisme majeur",
+        "anaphylaxie",
+        "hémorragie",
+        "brûlure grave",
+        "difficulté respiratoire",
+    ):
+        assert assess_triage({"symptoms": [symptom]}).priority == "urgence_maximale"

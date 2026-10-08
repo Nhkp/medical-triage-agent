@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Recognize missing French trauma/anaphylaxis emergencies and accented red-flag variants.
+
 - Run the quality gate with base development dependencies; keep MLflow and GPU training
   libraries optional.
 - Deploy the Modal demonstration through manually triggered GitHub Actions after quality

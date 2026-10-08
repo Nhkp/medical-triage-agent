@@ -24,6 +24,7 @@ RED_FLAGS = (
     "crise cardiaque",
     "difficulty breathing",
     "difficulte respiratoire",
+    "difficulté respiratoire",
     "shortness of breath",
     "avc",
     "stroke",
@@ -31,14 +32,18 @@ RED_FLAGS = (
     "perte de connaissance",
     "severe bleeding",
     "hemorragie",
+    "hémorragie",
     "major trauma",
+    "traumatisme majeur",
     "suicidal",
     "suicide",
     "anaphylaxis",
+    "anaphylaxie",
     "seizure",
     "convulsion",
     "severe burn",
     "brulure grave",
+    "brûlure grave",
 )
 
 
