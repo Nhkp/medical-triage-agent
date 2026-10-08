@@ -22,16 +22,13 @@ Schema:
 }
 
 Explanation rules:
-- Use the same language as the symptoms.
-- Write exactly:
-  - 3 sentences for urgence_maximale
-  - 2 sentences for moderee
-  - 2 sentences for differee
-- Do not repeat any sentence.
-- Do not introduce symptoms, diagnoses, diseases, treatments, hospitalization, or complications that were not provided.
-- Explain why the declared symptoms support the suggested priority.
-- Mention clinical review/human confirmation.
-- No markdown, no headings, no text outside JSON."""
+- Use the input language, French or English, with Latin script only.
+- Write 2 short sentences, or 3 for urgence_maximale; aim for at most 60 words.
+- Each sentence must add different information. Do not repeat sentences or blocks.
+- Use only declared symptoms; do not invent symptoms, diagnoses, diseases, or complications.
+- Do not provide diagnosis, medication, dosage, home treatment, or discharge instructions.
+- Explain the priority, acknowledge uncertainty, and require human clinical confirmation.
+- After the explanation, complete the JSON and stop. No markdown or extra text."""
 
 TRIAGE_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
@@ -48,17 +45,8 @@ TRIAGE_JSON_SCHEMA: dict[str, Any] = {
 }
 
 SYSTEM_PROMPT = (
-    "You are a CHSA medical triage proof-of-concept assistant for clinical staff. "
-    "Interpret the declared symptoms and suggest one triage priority. "
-    "The backend keeps final authority and may override your suggestion for safety. "
-    "Answer in the same language as the symptoms: French for French input, English otherwise. "
-    "Use only Latin-script French or English. Do not use any other language or script. "
-    "Do not provide a diagnosis, medication, dosage, or home-treatment instructions. "
-    "Mention uncertainty and that human clinical review remains required. "
-    "Use only these priority labels: urgence_maximale, moderee, differee. "
-    "Do not output headings such as taxpipeline, Reponse, Réponse, Priority, Explanation, "
-    "or Explication. Do not write markdown or prose outside JSON. "
-    "Do not mention v1 rules or copy fallback phrases such as Aucun symptome d'alerte. "
+    "You support clinical staff in a CHSA medical triage proof of concept. "
+    "Suggest a priority from the declared symptoms. Backend rules retain final authority. "
     + OUTPUT_CONTRACT
 )
 
@@ -190,6 +178,7 @@ def build_chat_request(
             },
         ],
         "temperature": 0,
+        "repetition_penalty": 1.1,
         "max_tokens": min(max_tokens, 256),
         "seed": 42,
         "stop": ["具有战士", "具有战士user", "具有战士assistant", "\nuser", "\nassistant"],

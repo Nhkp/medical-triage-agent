@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Simplify the serving prompt and apply repetition penalty 1.1 with the shared 256-token
+  ceiling.
+
 - Fix the model comparison ceiling at 256 tokens; retain length-limited generations
   as explicit model failures while permitting the campaign to measure them.
 - Use rule fallback for `truncated_output` and preserve raw format and generation

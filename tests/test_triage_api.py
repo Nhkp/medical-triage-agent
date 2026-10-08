@@ -261,23 +261,19 @@ def test_vllm_rejects_non_latin_repetitive_output() -> None:
 def test_vllm_system_prompt_limits_model_to_explanation_role() -> None:
     prompt = SYSTEM_PROMPT.casefold()
 
-    assert "suggest one triage priority" in prompt
-    assert "backend keeps final authority" in prompt
-    assert "latin-script french or english" in prompt
-    assert "do not provide a diagnosis" in prompt
-    assert "human clinical review remains required" in prompt
-    assert "suggested_priority" in prompt
-    assert "confidence" in prompt
+    assert "suggest a priority from the declared symptoms" in prompt
+    assert "backend rules retain final authority" in prompt
+    assert "french or english, with latin script only" in prompt
+    assert "do not provide diagnosis, medication, dosage" in prompt
+    assert "acknowledge uncertainty, and require human clinical confirmation" in prompt
     assert "return exactly one json object and nothing else" in prompt
     assert '"suggested_priority": "urgence_maximale" | "moderee" | "differee"' in prompt
-    assert "3 sentences for urgence_maximale" in prompt
-    assert "2 sentences for moderee" in prompt
-    assert "do not repeat any sentence" in prompt
-    assert "do not introduce symptoms, diagnoses, diseases, treatments, hospitalization" in prompt
-    assert "explain why the declared symptoms support the suggested priority" in prompt
-    assert "taxpipeline" in prompt
-    assert "aucun symptome d'alerte" in prompt
-    assert "no markdown, no headings, no text outside json" in prompt
+    assert "2 short sentences, or 3 for urgence_maximale" in prompt
+    assert "at most 60 words" in prompt
+    assert "each sentence must add different information" in prompt
+    assert "do not repeat sentences or blocks" in prompt
+    assert "use only declared symptoms" in prompt
+    assert "complete the json and stop" in prompt
 
 
 def test_vllm_request_context_keeps_only_expected_fields() -> None:
@@ -302,6 +298,7 @@ def test_vllm_request_context_keeps_only_expected_fields() -> None:
     assert "patient_name" not in user_payload
     assert "unrelated raw field" not in user_payload
     assert request["temperature"] == 0
+    assert request["repetition_penalty"] == 1.1
     assert request["max_tokens"] == 256
     assert request["guided_json"]["required"] == [
         "suggested_priority",
