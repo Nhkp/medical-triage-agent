@@ -11,6 +11,8 @@
   historical reviews separately with generation-length and missing-metadata indicators.
 - Prepare immutable adapter compatibility copies with tokenizer equivalence checks
   and block Kaggle measurement on technical preflight failures.
+- Document initial failed-serving evidence and pending corrected results in the README,
+  school report and presentation.
 
 - Run the quality gate with base development dependencies; keep MLflow and GPU training
   libraries optional.

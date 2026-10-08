@@ -165,7 +165,12 @@ Base/SFT-8k/DPO-8k sequentially on 48 synthetic bilingual cases, with pinned sna
 three measured passes and separate model/backend indicators. Run
 `make eval-model-comparison-dry-run` locally; use Kaggle for GPU execution. See
 [the evaluation protocol](docs/evaluation.md) for credentials, campaign exports and the
-pedagogical review grid. Real GPU measurements and reviewed conclusions remain pending.
+pedagogical review grid. The initial campaign `20261008T061839Z-8k` produced 144
+requests per model but exposed ignored JSON constraints and tokenizer fallback; it does
+not support a model recommendation. The corrected notebook retains the same revisions,
+uses `guided_json`, 256 tokens and six technical probes per model before measurement.
+Corrected GPU measurements and reviewed conclusions remain pending. Initial exports stay
+unchanged; the repaired review is written separately under `outputs/reviews/`.
 
 ## Demonstration deployment
 

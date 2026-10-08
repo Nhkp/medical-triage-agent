@@ -207,8 +207,8 @@ uv run python -m medical_triage_agent evaluate-safety
 Current model-backed evaluation status:
 
 - Historical 5k Colab metrics and main 8k checkpoint metrics are reported separately above.
-- Base vs SFT vs DPO deterministic generation evaluation remains to be run against the
-  published adapters.
+- The initial Base/SFT/DPO generation campaign exposed serving failures; a corrected
+  comparison against the same pinned adapters remains to be run.
 - Clinical safety, hallucination, bilingual quality, latency, and traceability metrics must be
   regenerated against the served DPO adapter before the final go/no-go decision.
 
@@ -228,15 +228,55 @@ Model calibration comparison:
 - Dated campaign exports include provenance, per-language metrics, errors/fallbacks,
   nearest-rank p50/p95 latency, response stability and a pedagogical review grid.
 - The local normalized overlap check passed against both current 8k training splits.
-- Real GPU measurements, the 144 first-pass review rows and model recommendation remain
-  pending: no Kaggle session or returned campaign artifacts are available locally.
+- The initial campaign `20261008T061839Z-8k` returned three reports (144 requests/model)
+  on two Tesla T4 GPUs, code revision `c217273add3036b3d0588ad93178101f46ff55b1`.
+  Its serving configuration is technically inadequate for model selection; corrected
+  measurements and 144 first-pass annotations remain pending.
 - See `docs/evaluation.md` for setup, resume/export steps, rubric and conditional selection.
   Training loss metrics and in-process fallback timing do not replace these campaign results.
+
+### Initial 8k campaign and serving remediation
+
+The immutable manifest and three local JSON reports for `20261008T061839Z-8k` are the
+source of the following historical measurements. “Accepted” includes safety validation;
+HTTP latency includes unusable model outputs and is not accepted-model performance.
+
+| Model | Measured requests | Accepted suggestions | Backend red-flag recall | HTTP p50 / p95 |
+| --- | --- | --- | --- | --- |
+| Base | 144 | 2/144 (1.39%) | 90% | 3.64 / 3.72 s |
+| SFT-8k | 144 | 0/144 | 90% | 9.85 / 10.84 s |
+| DPO-8k | 144 | 0/144 | 90% | 9.67 / 9.82 s |
+
+All three used seed 42, temperature zero and a 110-token cap. Server logs recorded ignored
+`structured_outputs`; SFT/DPO also fell back from their incompatible tokenizer configuration.
+The adapters were loaded, but these failures prevent attributing a reliable improvement to
+fine-tuning. The two rule misses were French anaphylaxis and major trauma. Backend protection
+must be distinguished from model safety. Missing finish reason/token counts prevent estimating
+generation-length failures; a storage preview flag does not establish generation completeness.
+The pedagogical review remains pending, so no hallucination or clinical-validation claim is made.
+
+The correction retains vLLM 0.10.2, Transformers 4.56.2 and the exact Base/SFT/DPO revisions
+listed in `docs/evaluation.md`. `guided_json` is sent from the first request with a common
+256-token cap. Audit/report metadata separate complete JSON/schema validity, safety acceptance,
+raw priority, accepted pre-arbitration priority and final backend priority. Compatible adapter
+copies preserve all weights and prove vocabulary/token/prompt equivalence before serving.
+A CPU check with Transformers 4.56.2 verified both local tokenizers (151,669 vocabulary entries)
+and all 48 prompt encodings. This is a local compatibility check, not GPU performance evidence.
+The shared rules now recognize “traumatisme majeur” and “anaphylaxie”, including accented forms
+of existing French signals; fixture labels are unchanged.
+
+A separate repaired CSV under `outputs/reviews/20261008T061839Z-8k/` restores input `language`
+and reserves `language_quality` for annotation without changing any initial campaign file.
+Each corrected model must pass six technical probes before two warmups and 144 measured calls.
+Safety rejections remain observations; technical failures block full measurement. A new dated
+campaign and its returned archive are required for comparison, review and model selection.
+Professional clinical validation remains outside the school scope.
 
 ## Deployment
 
 Current API supports LLM-assisted triage suggestions through a vLLM-compatible chat endpoint via
-`VLLM_BASE_URL`, `VLLM_MODEL_ID`, `VLLM_TIMEOUT_SECONDS`, and `API_KEY`. The LLM returns a
+`VLLM_BASE_URL`, `VLLM_MODEL_ID`, `VLLM_TIMEOUT_SECONDS`, `VLLM_STRUCTURED_OUTPUT`,
+`VLLM_MAX_TOKENS`, and `API_KEY`. The LLM returns a
 structured priority suggestion, explanation, and confidence; the FastAPI wrapper keeps final
 authority by applying a conservative rule-based safety floor before returning the final priority.
 This is not autonomous triage and still requires clinician review.
