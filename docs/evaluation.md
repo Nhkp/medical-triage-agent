@@ -179,3 +179,23 @@ leave `CAMPAIGN_DIR=None` and use a newly published code revision with a renewed
 secret. The notebook rejects resuming the initial serving configuration. Its export cell
 includes preflight reports even on failure. Corrected GPU results, 144 first-pass reviews,
 comparison with the initial campaign and final model selection remain pending artifact return.
+
+### Qualifying a different token ceiling
+
+The 20261008T082219Z-8k Base preflight stopped three of six probes at 256 tokens,
+leaving incomplete JSON. This is a technical qualification failure, not a model score.
+The tokenizer warning still requires inspecting the referenced local log lines.
+
+Keep the client default of 256 tokens. For a new qualification, set `MAX_TOKENS=512`
+in the notebook's preparation cell and leave `CAMPAIGN_DIR=None`. The chosen ceiling
+is recorded in the manifest, applied to the probes and all three models, and checked
+against effective client settings. This protocol change must be reported when comparing
+campaigns; it changes allowable output length and may affect latency and output quality.
+512 tokens is a candidate ceiling, not evidence that the probes will succeed. Do not
+remove format or tokenizer gates, modify expectations, or retry individual cases with
+higher limits. Keep failed preflight exports as evidence and use the same ceiling for
+all measured passes once technical qualification succeeds.
+
+Tokenizer warning detection matches whole words so configuration keys such as
+`error_on_recompile` do not masquerade as runtime errors. Preflight reports contain log
+line numbers, without exporting raw log lines or credentials.

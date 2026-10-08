@@ -390,6 +390,13 @@ def test_manifest_rejects_mutable_revisions_and_changed_inputs(tmp_path: Path) -
         },
     }
     module.validate_manifest(manifest, dataset)
+    manifest["generation"]["max_tokens"] = 512
+    module.validate_manifest(manifest, dataset)
+    for invalid in (0, -1, "512", True):
+        manifest["generation"]["max_tokens"] = invalid
+        with raises(ValueError, match="positive integer"):
+            module.validate_manifest(manifest, dataset)
+    manifest["generation"]["max_tokens"] = 512
     manifest["models"]["sft"]["adapter_revision"] = "main"
     with raises(ValueError, match="immutable"):
         module.validate_manifest(manifest, dataset)
@@ -595,3 +602,55 @@ def test_tokenizer_copy_blocks_changed_encoding_and_preserves_original(
     (destination / "adapter_model.safetensors").write_bytes(b"changed")
     with raises(ValueError, match="other than"):
         module.prepare_adapter_compatibility(source, destination, cases, "template")
+
+
+def test_preflight_records_actual_ceiling_and_pinpoints_tokenizer_warning(
+    monkeypatch: MonkeyPatch, tmp_path: Path
+) -> None:
+    module = _load_script()
+    cases = module.load_cases(Path("tests/fixtures/triage_calibration.jsonl"))
+    metadata = {"served_model_id": "base", "vllm_url": "http://vllm.test/v1"}
+    monkeypatch.setattr(module, "verify_served_model", lambda *args: None)
+    sent = []
+
+    def generate(url: str, request: dict[str, Any]) -> dict[str, Any]:
+        sent.append(request)
+        return {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "suggested_priority": "moderee",
+                                "explanation": "Clinical review is required.",
+                                "confidence": 0.5,
+                            }
+                        )
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"completion_tokens": 300},
+        }
+
+    monkeypatch.setattr(module, "_post_json", generate)
+    monkeypatch.setenv("VLLM_MAX_TOKENS", "512")
+    log = tmp_path / "vllm.log"
+    log.write_text("INFO tokenizer='/cache', error_on_recompile=False\n")
+    result = module.preflight_model("http://api.test", cases, metadata, log)
+    assert result["passed"] and not result["tokenizer_warning"]
+    assert result["generation"]["max_tokens"] == 512
+    assert len(sent) == 6 and all(request["max_tokens"] == 512 for request in sent)
+    log.write_text(
+        "INFO tokenizer='/cache', error_on_recompile=False\nWARNING Falling back to default tokenizer\n"
+    )
+    result = module.preflight_model("http://api.test", cases, metadata, log)
+    assert not result["passed"] and result["tokenizer_warning_line_numbers"] == [2]
+    log.write_text("ERROR Failed to load tokenizer\n")
+    assert module.preflight_model("http://api.test", cases, metadata, log)[
+        "tokenizer_warning_line_numbers"
+    ] == [1]
+    log.write_text("Tokenizer loaded\n")
+    monkeypatch.setenv("VLLM_MAX_TOKENS", "256")
+    result = module.preflight_model("http://api.test", cases, metadata, log)
+    assert result["generation"]["max_tokens"] == 256 and not result["passed"]

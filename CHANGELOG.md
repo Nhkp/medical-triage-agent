@@ -4,6 +4,11 @@
 
 ### Changed
 
+- Make the Kaggle token ceiling configurable and shared across manifest, preflight and
+  all served models; retain the 256-token default and require new campaigns for changes.
+- Diagnose preflight failures with case IDs and tokenizer log line numbers; avoid matching
+  configuration keys as tokenizer errors.
+
 - Recognize missing French trauma/anaphylaxis emergencies and accented red-flag variants.
 - Fix vLLM 0.10.2 structured generation with first-call guided JSON, validated serving
   settings, a 256-token default, and audit metadata for accepted and rejected outputs.

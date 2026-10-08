@@ -132,8 +132,13 @@ def main() -> int:
     preflight["manifest_checksum"] = checksum(Path(args.manifest))
     _write_json(output_dir / f"preflight_{name}.json", preflight)
     if not preflight["passed"]:
+        failed = [row["id"] for row in preflight["cases"] if not row["passed"]]
         raise ValueError(
-            "Technical preflight failed; inspect preflight report before any full campaign"
+            f"Technical preflight failed: cases={failed}; "
+            f"tokenizer_warning={preflight['tokenizer_warning']} "
+            f"(log lines {preflight['tokenizer_warning_line_numbers']}); "
+            f"ignored_json_parameter_warning={preflight['ignored_json_parameter_warning']}; "
+            f"report={output_dir / f'preflight_{name}.json'}"
         )
     result = evaluate_api_model(
         model_name=name,
@@ -279,12 +284,14 @@ def validate_manifest(manifest: dict[str, Any], dataset: Path) -> None:
     if not manifest.get("code_hashes") or not manifest.get("training_hashes"):
         raise ValueError("Manifest requires code and training split hashes")
     generation = manifest.get("generation", {})
+    max_tokens = generation.get("max_tokens")
+    if type(max_tokens) is not int or max_tokens <= 0:
+        raise ValueError("Campaign max_tokens must be a positive integer")
     if any(
         generation.get(key) != expected
         for key, expected in {
             "seed": 42,
             "temperature": 0,
-            "max_tokens": 256,
             "structured_output": "guided_json",
         }.items()
     ):
@@ -434,12 +441,13 @@ def preflight_model(
             log,
         )
     )
-    tokenizer_warning = bool(
-        re.search(
-            r"(?im)^.*tokenizer.*(?:fallback|failed|error)|^.*(?:fallback|failed|error).*tokenizer",
-            log,
-        )
-    )
+    tokenizer_warning_lines = [
+        number
+        for number, line in enumerate(log.splitlines(), 1)
+        if re.search(r"\btokenizer\b", line, re.IGNORECASE)
+        and re.search(r"\b(?:fallback|failed|error)\b|\bfall(?:ing)?\s+back\b", line, re.IGNORECASE)
+    ]
+    tokenizer_warning = bool(tokenizer_warning_lines)
     compatibility_ok = (
         not metadata.get("adapter")
         or metadata.get("tokenizer_compatibility", {}).get("equivalence_verified") is True
@@ -452,13 +460,16 @@ def preflight_model(
         "cases": rows,
         "ignored_json_parameter_warning": ignored,
         "tokenizer_warning": tokenizer_warning,
+        "tokenizer_warning_line_numbers": tokenizer_warning_lines,
         "tokenizer_equivalence_verified": compatibility_ok,
         "served_model_id": metadata["served_model_id"],
         "generation": {
             "seed": 42,
             "temperature": 0,
-            "max_tokens": 256,
-            "structured_output": "guided_json",
+            "max_tokens": request["max_tokens"],
+            "structured_output": "guided_json"
+            if "guided_json" in request
+            else "structured_outputs",
         },
     }
 
