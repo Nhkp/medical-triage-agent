@@ -5,6 +5,8 @@
 ### Changed
 
 - Recognize missing French trauma/anaphylaxis emergencies and accented red-flag variants.
+- Fix vLLM 0.10.2 structured generation with first-call guided JSON, validated serving
+  settings, a 256-token default, and audit metadata for accepted and rejected outputs.
 
 - Run the quality gate with base development dependencies; keep MLflow and GPU training
   libraries optional.

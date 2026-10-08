@@ -62,6 +62,11 @@ class TriageResponse:
     llm_confidence: float | None = None
     llm_response_preview: str | None = None
     llm_response_truncated: bool = False
+    finish_reason: str | None = None
+    completion_tokens: int | None = None
+    raw_json_valid: bool | None = None
+    raw_schema_valid: bool | None = None
+    raw_suggested_priority: str | None = None
     priority_source: str = "rule"
     arbitration: str = "rule_only"
 
@@ -139,6 +144,11 @@ def audit_metadata(
             else None
         ),
         "llm_response_truncated": response.llm_response_truncated,
+        "finish_reason": response.finish_reason,
+        "completion_tokens": response.completion_tokens,
+        "raw_json_valid": response.raw_json_valid,
+        "raw_schema_valid": response.raw_schema_valid,
+        "raw_suggested_priority": response.raw_suggested_priority,
         "priority_source": response.priority_source,
         "arbitration": response.arbitration,
         "model": model,

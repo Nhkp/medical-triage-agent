@@ -302,13 +302,13 @@ def test_vllm_request_context_keeps_only_expected_fields() -> None:
     assert "patient_name" not in user_payload
     assert "unrelated raw field" not in user_payload
     assert request["temperature"] == 0
-    assert request["max_tokens"] == 110
-    assert request["structured_outputs"]["json"]["required"] == [
+    assert request["max_tokens"] == 256
+    assert request["guided_json"]["required"] == [
         "suggested_priority",
         "explanation",
         "confidence",
     ]
-    assert request["structured_outputs"]["json"]["additionalProperties"] is False
+    assert request["guided_json"]["additionalProperties"] is False
     assert "具有战士" in request["stop"]
     assert "具有战士user" in request["stop"]
     assert "\nassistant" in request["stop"]
@@ -882,6 +882,107 @@ def test_generate_explanation_reports_connection_error(monkeypatch: MonkeyPatch)
     assert result.llm_status == "connection_error"
 
 
+def test_generation_configuration_is_validated(monkeypatch: MonkeyPatch) -> None:
+    from pytest import raises
+
+    payload = {"symptoms": ["runny nose"]}
+    response = assess_triage(payload)
+    monkeypatch.setenv("VLLM_STRUCTURED_OUTPUT", "structured_outputs")
+    monkeypatch.setenv("VLLM_MAX_TOKENS", "512")
+    request = build_chat_request(payload, response)
+    assert request["max_tokens"] == 512
+    assert request["seed"] == 42
+    assert "structured_outputs" in request
+    monkeypatch.setenv("VLLM_STRUCTURED_OUTPUT", "unknown")
+    with raises(ValueError, match="VLLM_STRUCTURED_OUTPUT"):
+        build_chat_request(payload, response)
+    monkeypatch.setenv("VLLM_STRUCTURED_OUTPUT", "guided_json")
+    for invalid in ("0", "-1", "1.5", ""):
+        monkeypatch.setenv("VLLM_MAX_TOKENS", invalid)
+        with raises(ValueError, match="VLLM_MAX_TOKENS"):
+            build_chat_request(payload, response)
+
+
+def test_first_call_is_guided_and_rejected_metadata_reaches_audit(monkeypatch: MonkeyPatch) -> None:
+    from medical_triage_agent import vllm_client
+
+    calls = []
+
+    def remote(request: Any, **kwargs: Any) -> _Response:
+        calls.append(json.loads(request.data))
+        return _Response(
+            json.dumps(
+                {
+                    "choices": [
+                        {
+                            "message": {
+                                "content": json.dumps(
+                                    {
+                                        "suggested_priority": "moderee",
+                                        "explanation": "Take aspirin 100 mg.",
+                                        "confidence": 0.5,
+                                    }
+                                )
+                            },
+                            "finish_reason": "stop",
+                        }
+                    ],
+                    "usage": {"completion_tokens": 25},
+                }
+            ).encode()
+        )
+
+    monkeypatch.setenv("VLLM_BASE_URL", "http://vllm.test/v1")
+    monkeypatch.setattr(vllm_client, "urlopen", remote)
+    response = api.triage({"symptoms": ["runny nose"]})
+    record = api.audit(response["audit_id"])
+    assert len(calls) == 1 and "guided_json" in calls[0]
+    assert calls[0]["max_tokens"] == 256
+    assert response["llm_status"] == "invalid_output"
+    assert record is not None
+    assert record["finish_reason"] == "stop" and record["completion_tokens"] == 25
+    assert record["raw_schema_valid"] is True
+    assert "finish_reason" not in response
+
+
+def test_generation_length_is_independent_of_preview_truncation() -> None:
+    from medical_triage_agent.vllm_client import extract_triage_generation
+
+    result = extract_triage_generation(
+        {
+            "choices": [
+                {"message": {"content": '{"explanation":"unfinished'}, "finish_reason": "length"}
+            ],
+            "usage": {"completion_tokens": 256},
+        }
+    )
+    assert result.finish_reason == "length" and result.completion_tokens == 256
+    assert not result.llm_response_truncated and result.raw_json_valid is False
+    assert extract_triage_generation({}).finish_reason is None
+    assert extract_triage_generation({}).completion_tokens is None
+    accepted = extract_triage_generation(
+        {
+            "choices": [
+                {
+                    "message": {
+                        "content": json.dumps(
+                            {
+                                "suggested_priority": "moderee",
+                                "explanation": "The runny nose needs assessment. Human clinical review is required.",
+                                "confidence": 0.5,
+                            }
+                        )
+                    },
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {"completion_tokens": 45},
+        }
+    )
+    assert accepted.llm_status == "accepted"
+    assert accepted.finish_reason == "stop" and accepted.completion_tokens == 45
+
+
 def test_french_trauma_and_anaphylaxis_are_protected_without_model() -> None:
     for symptom in (
         "traumatisme majeur",
@@ -891,3 +992,30 @@ def test_french_trauma_and_anaphylaxis_are_protected_without_model() -> None:
         "difficulté respiratoire",
     ):
         assert assess_triage({"symptoms": [symptom]}).priority == "urgence_maximale"
+
+
+def test_invalid_priority_type_keeps_finish_metadata_without_patient_text() -> None:
+    from medical_triage_agent.vllm_client import extract_triage_generation
+
+    payload: dict[str, Any] = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps(
+                        {
+                            "suggested_priority": [],
+                            "explanation": "Clinical review required.",
+                            "confidence": 0.5,
+                        }
+                    )
+                },
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {"completion_tokens": 12},
+    }
+    result = extract_triage_generation(payload)
+    assert result.llm_status == "invalid_output" and result.raw_schema_valid is False
+    assert result.finish_reason == "stop" and result.completion_tokens == 12
+    payload["choices"][0]["finish_reason"] = "Untrusted patient text"
+    assert extract_triage_generation(payload).finish_reason is None

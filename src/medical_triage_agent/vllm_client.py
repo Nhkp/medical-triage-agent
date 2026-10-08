@@ -4,7 +4,7 @@ import json
 import os
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Literal
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -85,6 +85,11 @@ class TriageGenerationResult:
     confidence: float | None = None
     llm_response_preview: str | None = None
     llm_response_truncated: bool = False
+    finish_reason: str | None = None
+    completion_tokens: int | None = None
+    raw_json_valid: bool | None = None
+    raw_schema_valid: bool | None = None
+    raw_suggested_priority: str | None = None
 
     @property
     def explanation_source(self) -> str:
@@ -122,7 +127,9 @@ def generate_triage(payload: dict[str, Any], response: TriageResponse) -> Triage
             response_text = raw.read().decode("utf-8")
             response_payload = json.loads(response_text)
     except HTTPError as exc:
-        if not _should_retry_with_legacy_guided_json(exc):
+        if "structured_outputs" not in request_payload or not _should_retry_with_legacy_guided_json(
+            exc
+        ):
             return TriageGenerationResult(explanation=None, llm_status="connection_error")
         return _generate_triage_with_legacy_guided_json(base_url, payload, response)
     except TimeoutError:
@@ -151,10 +158,23 @@ def build_chat_request(
     payload: dict[str, Any],
     response: TriageResponse,
     *,
-    structured_output: Literal["structured_outputs", "guided_json"] = "structured_outputs",
+    structured_output: Literal["structured_outputs", "guided_json"] | None = None,
 ) -> dict[str, Any]:
     """Build a chat-completions payload with the CHSA safety output contract."""
 
+    selector = (
+        structured_output
+        if structured_output is not None
+        else os.environ.get("VLLM_STRUCTURED_OUTPUT", "guided_json")
+    )
+    if selector not in {"guided_json", "structured_outputs"}:
+        raise ValueError("VLLM_STRUCTURED_OUTPUT must be guided_json or structured_outputs")
+    try:
+        max_tokens = int(os.environ.get("VLLM_MAX_TOKENS", "256"))
+    except ValueError as exc:
+        raise ValueError("VLLM_MAX_TOKENS must be a positive integer") from exc
+    if max_tokens <= 0:
+        raise ValueError("VLLM_MAX_TOKENS must be a positive integer")
     request: dict[str, Any] = {
         "model": configured_model(),
         "messages": [
@@ -170,10 +190,11 @@ def build_chat_request(
             },
         ],
         "temperature": 0,
-        "max_tokens": 110,
+        "max_tokens": max_tokens,
+        "seed": 42,
         "stop": ["具有战士", "具有战士user", "具有战士assistant", "\nuser", "\nassistant"],
     }
-    if structured_output == "guided_json":
+    if selector == "guided_json":
         request["guided_json"] = TRIAGE_JSON_SCHEMA
     else:
         request["structured_outputs"] = {"json": TRIAGE_JSON_SCHEMA}
@@ -262,6 +283,52 @@ def extract_explanation(payload: dict[str, Any]) -> ExplanationResult:
 
 
 def extract_triage_generation(payload: dict[str, Any]) -> TriageGenerationResult:
+    """Preserve transport metadata even when content fails safety validation."""
+
+    choices = payload.get("choices")
+    choice = choices[0] if isinstance(choices, list) and choices else {}
+    finish = choice.get("finish_reason") if isinstance(choice, dict) else None
+    usage = payload.get("usage")
+    tokens = usage.get("completion_tokens") if isinstance(usage, dict) else None
+    content = _raw_content(payload)
+    json_valid = schema_valid = None
+    raw_priority = None
+    if content is not None:
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError:
+            json_valid = schema_valid = False
+        else:
+            json_valid = True
+            if (
+                isinstance(data, dict)
+                and isinstance(data.get("suggested_priority"), str)
+                and data["suggested_priority"] in TRIAGE_ORDER
+            ):
+                raw_priority = data["suggested_priority"]
+            schema_valid = (
+                isinstance(data, dict)
+                and set(data) == {"suggested_priority", "explanation", "confidence"}
+                and isinstance(data.get("suggested_priority"), str)
+                and data["suggested_priority"] in TRIAGE_ORDER
+                and isinstance(data.get("explanation"), str)
+                and type(data.get("confidence")) in {int, float}
+                and 0 <= data["confidence"] <= 1
+            )
+    return replace(
+        _extract_triage_content(payload),
+        finish_reason=finish
+        if isinstance(finish, str)
+        and finish in {"stop", "length", "tool_calls", "content_filter", "function_call"}
+        else None,
+        completion_tokens=tokens if type(tokens) is int and tokens >= 0 else None,
+        raw_json_valid=json_valid,
+        raw_schema_valid=schema_valid,
+        raw_suggested_priority=raw_priority,
+    )
+
+
+def _extract_triage_content(payload: dict[str, Any]) -> TriageGenerationResult:
     """Extract, validate, and possibly repair the model's structured triage output."""
 
     content = _raw_content(payload)
@@ -450,7 +517,11 @@ def _accepted_or_invalid_result(
 ) -> TriageGenerationResult:
     """Accept only safe schema-valid generations, preserving previews for audit."""
 
-    if suggested_priority not in TRIAGE_ORDER or not isinstance(explanation, str):
+    if (
+        not isinstance(suggested_priority, str)
+        or suggested_priority not in TRIAGE_ORDER
+        or not isinstance(explanation, str)
+    ):
         return TriageGenerationResult(
             explanation=None,
             llm_status="invalid_output",
