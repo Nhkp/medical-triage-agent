@@ -119,8 +119,9 @@ def main() -> int:
     if (
         any(
             request[key] != manifest["generation"][key]
-            for key in ("seed", "temperature", "max_tokens")
+            for key in ("seed", "temperature", "max_tokens", "repetition_penalty")
         )
+        or request["messages"][0]["content"] != manifest["generation"]["system_prompt"]
         or "guided_json" not in request
     ):
         raise ValueError("Effective generation differs from manifest")
@@ -283,6 +284,8 @@ def validate_manifest(manifest: dict[str, Any], dataset: Path) -> None:
             raise ValueError(f"Code differs from campaign manifest: {filename}")
     if not manifest.get("code_hashes") or not manifest.get("training_hashes"):
         raise ValueError("Manifest requires code and training split hashes")
+    from medical_triage_agent.vllm_client import SYSTEM_PROMPT
+
     generation = manifest.get("generation", {})
     max_tokens = generation.get("max_tokens")
     if type(max_tokens) is not int or max_tokens != 256:
@@ -293,6 +296,8 @@ def validate_manifest(manifest: dict[str, Any], dataset: Path) -> None:
             "seed": 42,
             "temperature": 0,
             "structured_output": "guided_json",
+            "repetition_penalty": 1.1,
+            "system_prompt": SYSTEM_PROMPT,
         }.items()
     ):
         raise ValueError(
@@ -471,6 +476,8 @@ def preflight_model(
             "seed": 42,
             "temperature": 0,
             "max_tokens": request["max_tokens"],
+            "repetition_penalty": request["repetition_penalty"],
+            "system_prompt": request["messages"][0]["content"],
             "structured_output": "guided_json"
             if "guided_json" in request
             else "structured_outputs",
@@ -568,7 +575,10 @@ def _measure_case(base_url: str, case: CalibrationCase, repeat: int) -> dict[str
     error = None
     started = time.perf_counter()
     try:
-        response = _post_json(base_url.rstrip("/") + "/triage", {"symptoms": case.symptoms})
+        response = _post_json(
+            base_url.rstrip("/") + "/triage",
+            {"symptoms": case.symptoms, "language": case.language},
+        )
     except (OSError, ValueError, TypeError, TimeoutError) as exc:
         error = "triage:" + type(exc).__name__
     latency = (time.perf_counter() - started) * 1000

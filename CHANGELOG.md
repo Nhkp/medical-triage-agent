@@ -6,9 +6,10 @@
 
 - Accept safe complete single sentences after duplicate removal while preserving original
   previews and rejecting incomplete generations.
-
 - Simplify the serving prompt and apply repetition penalty 1.1 with the shared 256-token
   ceiling.
+- Record and verify the exact system prompt and repetition penalty in new Kaggle campaigns;
+  align measured requests with preflight input language.
 
 - Fix the model comparison ceiling at 256 tokens; retain length-limited generations
   as explicit model failures while permitting the campaign to measure them.

@@ -9,6 +9,8 @@ from typing import Any
 
 from pytest import MonkeyPatch, raises
 
+from medical_triage_agent.vllm_client import SYSTEM_PROMPT
+
 
 def test_triage_calibration_fixture_has_required_coverage() -> None:
     module = _load_script()
@@ -387,9 +389,17 @@ def test_manifest_rejects_mutable_revisions_and_changed_inputs(tmp_path: Path) -
             "temperature": 0,
             "max_tokens": 256,
             "structured_output": "guided_json",
+            "repetition_penalty": 1.1,
+            "system_prompt": SYSTEM_PROMPT,
         },
     }
     module.validate_manifest(manifest, dataset)
+    for key, invalid in (("system_prompt", "old prompt"), ("repetition_penalty", 1.0)):
+        original = manifest["generation"][key]
+        manifest["generation"][key] = invalid
+        with raises(ValueError, match="generation settings"):
+            module.validate_manifest(manifest, dataset)
+        manifest["generation"][key] = original
     for invalid in (0, -1, "512", True, 512):
         manifest["generation"]["max_tokens"] = invalid
         with raises(ValueError, match="exactly 256"):
@@ -642,6 +652,9 @@ def test_preflight_records_actual_ceiling_and_pinpoints_tokenizer_warning(
     assert result["passed"] and not result["tokenizer_warning"]
     assert result["generation"]["max_tokens"] == 256
     assert len(sent) == 6 and all(request["max_tokens"] == 256 for request in sent)
+    assert result["generation"]["system_prompt"] == SYSTEM_PROMPT
+    assert result["generation"]["repetition_penalty"] == 1.1
+    assert all(request["repetition_penalty"] == 1.1 for request in sent)
     log.write_text(
         "INFO tokenizer='/cache', error_on_recompile=False\nWARNING Falling back to default tokenizer\n"
     )
@@ -705,3 +718,18 @@ def test_preflight_keeps_incomplete_capped_json_as_measured_failure(
     assert not module.preflight_model("http://api.test", cases, metadata, log)["passed"]
     del raw["usage"]
     assert not module.preflight_model("http://api.test", cases, metadata, log)["passed"]
+
+
+def test_measured_requests_keep_input_language(monkeypatch: MonkeyPatch) -> None:
+    module = _load_script()
+    cases = module.load_cases(Path("tests/fixtures/triage_calibration.jsonl"))
+    sent = []
+
+    def post(url: str, payload: dict[str, Any]) -> dict[str, Any]:
+        sent.append(payload)
+        return {"priority": "moderee", "explanation": "Synthetic fallback."}
+
+    monkeypatch.setattr(module, "_post_json", post)
+    for case in cases:
+        module._measure_case("http://api.test", case, 1)
+    assert sent == [{"symptoms": c.symptoms, "language": c.language} for c in cases]

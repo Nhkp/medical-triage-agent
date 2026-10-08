@@ -33,9 +33,23 @@ or review exports belong in Git.
 The notebook resolves Base/SFT-8k/DPO-8k snapshots to immutable Hub revisions, loads local
 snapshots and uses the same SFT chat template for all configurations. It records dataset,
 training-split, code and asset hashes, Git state, package versions, hardware and parameters.
-The seed is 42, temperature is zero, max output is 256 tokens, and the prompt includes
+The seed is 42, temperature is zero, repetition penalty is 1.1, max output is 256 tokens,
+and the prompt includes
 the backend rule priority. This measures usable suggestions in the POC's serving context,
 not independent clinical reasoning or a model's unfiltered priority.
+
+New manifests record the exact system prompt and repetition penalty and validate them
+against the shared client. Start a new campaign for this revision; previous evidence remains
+unchanged. Preflight and measured requests both include the input language.
+The compact prompt requests two short sentences (three for emergencies), aiming for at
+most 60 words. This target and the penalty reduce repetition but do not guarantee its absence.
+After parsing, the client removes duplicate sentences or blocks from the explanation only,
+keeping their first occurrence and distinct subsequent text. A safe complete sentence of
+at least 20 characters may remain and is accepted as `accepted_repaired`; priority and
+confidence are preserved. Original expurgated previews remain available for review and
+raw repetition metrics stay separate from repair rates. Incomplete JSON, unsafe text and
+length-limited generations retain the rule fallback; no missing fields are fabricated.
+Corrected performance remains pending a new Kaggle run and pedagogical review.
 
 The fixture has 24 bilingual pairs (48 synthetic cases): ten red-flag situations, seven
 common symptoms, three ambiguous situations, and four dangerous requests. The twelve
