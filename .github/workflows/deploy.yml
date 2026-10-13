@@ -27,8 +27,8 @@ jobs:
       - run: docker compose --env-file .env.example config --quiet
       - name: Deploy Modal
         env:
-          MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
-          MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
+          # MODAL_TOKEN_ID: ${{ secrets.MODAL_TOKEN_ID }}
+          # MODAL_TOKEN_SECRET: ${{ secrets.MODAL_TOKEN_SECRET }}
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
           TRIAGE_API_TOKEN: ${{ secrets.TRIAGE_API_TOKEN }}
           MODAL_URL: ${{ vars.MODAL_URL }}
@@ -41,7 +41,8 @@ jobs:
           from pathlib import Path
           from urllib.parse import urlsplit
 
-          required = ("MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET", "HF_TOKEN", "TRIAGE_API_TOKEN")
+          # required = ("MODAL_TOKEN_ID", "MODAL_TOKEN_SECRET", "HF_TOKEN", "TRIAGE_API_TOKEN")
+          required = ("HF_TOKEN", "TRIAGE_API_TOKEN")
           missing = [key for key in required if not os.environ.get(key, "").strip()]
           if missing:
               raise SystemExit("Missing GitHub secrets: " + ", ".join(missing))
