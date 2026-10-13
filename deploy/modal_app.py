@@ -167,9 +167,8 @@ def wait_for_vllm(timeout_seconds: int = VLLM_STARTUP_TIMEOUT_SECONDS) -> None:
 def start_vllm_process() -> subprocess.Popen[Any]:
     """Start vLLM with the Modal serving environment."""
 
-    env = os.environ.copy()
-    env.update(build_runtime_env())
-    return subprocess.Popen(build_vllm_command(), env=env)
+    os.environ.update(build_runtime_env())
+    return subprocess.Popen(build_vllm_command())
 
 
 def terminate_process(process: subprocess.Popen[Any]) -> None:

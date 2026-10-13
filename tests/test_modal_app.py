@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import importlib
 import json
+import os
+from typing import Any
 
 from fastapi.testclient import TestClient
 from pytest import MonkeyPatch
@@ -84,3 +87,37 @@ def test_modal_triage_accepts_correct_bearer_token(monkeypatch: MonkeyPatch) -> 
 
     assert response.status_code == 200
     assert response.json()["priority"] == "urgence_maximale"
+
+
+def test_modal_startup_configures_both_fastapi_and_vllm(monkeypatch: MonkeyPatch) -> None:
+    module = importlib.import_module("deploy.modal_app")
+    for key in module.build_runtime_env():
+        monkeypatch.setenv(key, "")
+    started = []
+    stopped: list[object] = []
+    process = object()
+
+    def start(command: list[str]) -> Any:
+        started.append(command)
+        assert {
+            key: os.environ[key] for key in module.build_runtime_env()
+        } == module.build_runtime_env()
+        return process
+
+    monkeypatch.setattr(module.subprocess, "Popen", start)
+    monkeypatch.setattr(module, "wait_for_vllm", lambda: None)
+    monkeypatch.setattr(module, "terminate_process", stopped.append)
+
+    async def check() -> None:
+        app = module.create_authenticated_api_app()
+        async with module.lifespan(app):
+            response = TestClient(app).get("/health")
+            assert response.json() == {
+                "status": "ok",
+                "model": "medical-triage-dpo-8k",
+                "vllm": "configured",
+            }
+
+    asyncio.run(check())
+    assert started == [module.build_vllm_command()]
+    assert stopped == [process]

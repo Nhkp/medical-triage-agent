@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Configure the Modal FastAPI process with the same local vLLM URL and model alias as
+  its child server, preventing unintended rule-only serving after GPU startup.
+
 - Accept safe complete single sentences after duplicate removal while preserving original
   previews and rejecting incomplete generations.
 - Simplify the serving prompt and apply repetition penalty 1.1 with the shared 256-token
