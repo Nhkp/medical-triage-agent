@@ -180,6 +180,15 @@ use; it is not professional clinical validation. See the [school report](docs/re
 
 ## Demonstration deployment
 
+- API: <https://nhkp--medical-triage-agent-fastapi-app.modal.run>
+- Streamlit interface: <https://medical-triage-agent-pdpx7epnuhahosrexrdrjn.streamlit.app/>
+- Health: <https://nhkp--medical-triage-agent-fastapi-app.modal.run/health>
+
+The interface uses a server-side bearer secret; visitors do not receive a token.
+Its API address is locked when that secret is configured, and authenticated requests
+cannot redirect. Use synthetic data only in a supervised engineering demonstration.
+
+
 The `deploy-demo` GitHub Actions workflow runs checks, builds Docker, validates Compose,
 deploys to Modal on manual launch, and polls `/health` for up to fifteen minutes.
 Configure the four GitHub secrets and the `MODAL_URL` variable described in
@@ -187,8 +196,10 @@ Configure the four GitHub secrets and the `MODAL_URL` variable described in
 [Actions run 38448371074](https://github.com/Nhkp/medical-triage-agent/actions/runs/38448371074)
 deployed commit `285d4c1` on 13 October 2026. A direct Modal health check reported
 `medical-triage-dpo-8k` / `configured`; the Streamlit interface was independently rendered
-on Render. Post-fix remote inference quality, remote latency/robustness and equality of
-live serving assets with the pinned Kaggle snapshots are not yet established by this evidence.
+on Render. The final source now downloads and verifies pinned Base/SFT/DPO snapshots, reuses the
+qualified tokenizer conversion and fixes the shared chat template. It has not been
+redeployed: token revocation/replacement remains pending owner action. Post-fix remote
+inference quality and remote latency/robustness are not yet established.
 A configuration health check is not proof of an accepted model answer.
 
 ## Limitations
@@ -234,3 +245,20 @@ speaker notes are generated under ignored `dist/` folders. The PDF report stays 
 20 pages including references. `make presentation-pptx` exports the canonical deck.
 AI-assisted preannotations and the completed human-validation ledger stay outside Git.
 User approval does not establish professional clinical validation.
+
+## Submission deliverables
+
+Generated files stay outside Git under `dist/`:
+
+- `chsa-school-submission.zip`: report, defence deck, sources and technical/pedagogical evidence.
+- `chsa-dataset-8k.zip`: verified 8k/2k splits, source/licence attribution, manifest and privacy audit.
+- `chsa-adapters-8k.zip`: original evaluated SFT/DPO LoRA snapshots, pinned base reference and loading instructions.
+- `reports/chsa-school-report.pdf` and `.docx`: English report, at most 20 pages.
+- `presentations/chsa-current-state.pptx` and `.pdf`: 14 slides with speaker notes.
+- `demo-rule-only.mp4`: labelled local deterministic fallback walkthrough, not cloud LLM evidence.
+
+Local training weights differ from the evaluated Hub snapshots; only hash-verified evaluated
+files are packaged. The base weights are not duplicated in the adapter archive: download
+Qwen3-1.7B-Base at the recorded revision. Rotate the exposed tokens before the final Modal
+redeployment; then qualify authenticated FR/EN requests and audits and record the final live
+walkthrough. Professional clinical validation remains outside the school submission.

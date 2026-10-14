@@ -173,7 +173,7 @@ submission evidence supplement rather than printed as wide tables in this report
 
 Qwen3-1.7B-Base is the common base model. The implementation uses supervised adaptation
 with LoRA and 4-bit loading, followed by DPO on preference pairs, without a separate reward
-model. GRPO remains optional and is not part of the reported comparison. Configurations,
+model. GRPO was not used and its optional implementation has been removed from the final scope. Configurations,
 checkpoint state and training scripts provide the reproducibility path.
 
 Repository configurations specify one epoch, sequence length 512, batch size one,
@@ -198,8 +198,10 @@ validation indicators:
 Evidence is the respective `trainer_state.json` files under
 `outputs/experiments/dataset-8k/`. SFT and DPO losses describe different objectives; they
 cannot be compared as if a smaller DPO loss proved superior generation. Preference reward
-accuracy reflects the validation preference objective, not clinical safety. Local checkpoint
-paths also do not establish a byte-for-byte link to the evaluated published adapters.
+accuracy reflects the validation preference objective, not clinical safety. Hash verification now establishes that the local exported weights and adapter configs
+differ from the evaluated Hub snapshots. These checkpoint indicators must not be attributed
+to those evaluated weights. The delivery therefore packages the original evaluated snapshots,
+verified against the campaign hashes, rather than the differing local exports.
 
 ## 4.3 Evaluated snapshots
 
@@ -213,7 +215,8 @@ The Kaggle campaign downloaded these immutable snapshots and recorded file hashe
 
 The training dataset reference is `Lokhidor/medical-triage-dataset-8k`, revision
 `4624343366c819784ccc1feaeefba2da8455398c`. Snapshot availability at campaign execution
-is established by the exports; current public/private visibility is not inferred.
+is established by the exports. The evaluated SFT/DPO snapshot files were also downloaded
+without credentials and hash-verified during final packaging on 14 October 2026.
 
 Adapters were served from local compatibility copies. The legacy tokenizer token list
 was moved from `extra_special_tokens` to `additional_special_tokens`; weights were not
@@ -426,11 +429,16 @@ The Community Cloud URL is
 show a triage call and audit ID before the environment correction, but explicitly in
 `not_configured` fallback mode. They are not proof of post-fix model inference.
 
-The deployed Modal configuration references DPO-8k, but its static adapter specification
-uses a Hub repository rather than enforcing the separate documented adapter SHA. It also
-does not reuse Kaggle's local compatibility preparation. Consequently the deployed serving
-assets/configuration are not proven identical to the evaluation snapshots. This gap belongs
-in the roadmap, rather than attributing Kaggle scores to the live endpoint.
+The final source now resolves the pinned Base/SFT/DPO snapshots, checks their recorded
+hashes, prepares immutable tokenizer compatibility copies and loads the shared SFT chat
+template explicitly. A serving manifest records parameters, revisions, versions and tokenizer
+proofs before GPU serving. CPU tests qualify that preparation; they do not prove a live run.
+
+The API root is <https://nhkp--medical-triage-agent-fastapi-app.modal.run> and the primary
+interface is <https://medical-triage-agent-pdpx7epnuhahosrexrdrjn.streamlit.app/>.
+Render is retained only as historical interface evidence. The final revision has not been
+redeployed: the owner confirmed that previously exposed HF/API tokens have not yet been
+revoked and replaced. No new final-deployment success is claimed.
 
 ## 8.2 What is not yet evidenced
 
@@ -462,14 +470,16 @@ improved completeness, repetition indicators and latency. The measured compariso
 DPO's higher automatic acceptance and Base's lower latency, not a safe clinical model winner.
 
 The pedagogical review is complete and the report and slides incorporate its corrections.
-Remaining school preparation is to rehearse an honestly labelled, supervised demonstration
-and archive the submission evidence. Professional clinical validation remains outside
+Remaining school preparation is owner token rotation, final deployment qualification,
+and rehearsal of an honestly labelled, supervised demonstration. Separate dataset and
+adapter archives contain the verified deliverables; a local rule-only backup is labelled
+as such and cannot replace evidence of remote LLM inference. Professional clinical validation remains outside
 the completed school scope.
 
 | Stage | Deliverable / decision gate |
 | --- | --- |
 | School finalisation | 144 annotations validated; archive evidence and rehearse |
-| Serving consistency | Enforce adapter SHA and reuse verified tokenizer compatibility on Modal |
+| Serving consistency | Source qualification implemented; redeploy after token rotation and prove remote inference |
 | Safer explanations | Fix refusal/provenance failures; remeasure changed behaviour on a new campaign |
 | Deployment qualification | Record authenticated inference, remote robustness, latency and audit retrieval |
 | Clinical pilot | Qualified review of labels, protocols, thresholds and failures; prospective evaluation |

@@ -48,7 +48,7 @@ Canonical source: `presentations/chsa-current-state/index.html`. Both report and
 
 ## 12. Modal Deployment and Demo Walkthrough
 
-60 s. State the FastAPI parent-environment correction. User screenshot before the fix was rule-only; it must not be used as model success proof. Modal does not yet enforce the same static adapter SHA/compatibility copies as Kaggle. UI is separate, observed on Render and also used on Community Cloud. Use synthetic FR/EN input, emergency and dangerous request, show audit/status. Keep recorded backup, not fabricated output.
+60 s. State the FastAPI parent-environment correction. User screenshot before the fix was rule-only; it must not be used as model success proof. The final source qualifies pinned local snapshots, hashes and tokenizer compatibility, but redeployment awaits owner token rotation. The primary UI is Streamlit Community Cloud; Render is historical evidence. Use synthetic FR/EN input, emergency and dangerous request, show audit/status. Keep recorded backup, not fabricated output.
 
 ## 13. Evidence Limits and Demo Decision
 

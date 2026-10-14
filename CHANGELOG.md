@@ -4,6 +4,15 @@
 
 ### Changed
 
+- Preserve completed human-review status when regenerating summaries and reject
+  mismatched campaign validation ledgers.
+
+- Align local/notebook serving with the evaluated chat template and explicit FP16,
+  and qualify the pinned DPO tokenizer in the Kaggle serving notebook.
+
+- Link the public API/interface and package verified dataset and evaluated adapter archives;
+  document differing local training weights and owner-dependent final deployment.
+
 - Restrict server UI credentials to the configured endpoint, refuse authenticated redirects,
   and authenticate remote smoke checks without masking HTTP or missing-audit failures.
 - Qualify pinned Modal snapshots against the evaluated hashes and shared tokenizer conversion,

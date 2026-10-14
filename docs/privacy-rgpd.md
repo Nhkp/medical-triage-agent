@@ -37,3 +37,15 @@ The account owner must revoke and replace `HF_TOKEN` and `TRIAGE_API_TOKEN`, upd
 `.env` and GitHub Actions secrets, then redeploy to refresh the named Modal secrets.
 Do not reuse the exposed values in GitHub. Rotation has not been performed by this agent.
 No history rewrite is indicated by the current findings.
+
+## Final repository credential review — 2026-10-14
+
+The final review scanned 1096 locally available Git objects for HF, GitHub and
+Modal token literals and private-key headers. It found 0 matching candidate secrets.
+Only paths and categories are reported; secret values are never reproduced. This is a
+pattern-based check, not a guarantee about all credential formats or remote-only refs.
+
+The owner confirmed that previously exposed HF/API tokens have not yet been revoked
+and replaced. Final deployment/security sign-off therefore remains pending owner action.
+Public snapshot downloads for packaging used no credentials. No history rewrite is
+indicated by the scan results.
