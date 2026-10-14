@@ -20,14 +20,12 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
 APP_NAME = "medical-triage-agent"
-BASE_MODEL = "Qwen/Qwen3-1.7B-Base"
-BASE_MODEL_REVISION = "ea980cb0a6c2ae4b936e82123acc929f1cec04c1"
-ADAPTER_REPO = "Lokhidor/medical-triage-qwen3-dpo-lora-8k"
-ADAPTER_REVISION = "9f1c83f91064a8b464bc9e8b87f91231c617b2e7"
 CONFIG_PATH = Path("/app/configs/serving.json")
 if not CONFIG_PATH.exists():
     CONFIG_PATH = Path(__file__).resolve().parents[1] / "configs/serving.json"
 SERVING_CONFIG = json.loads(CONFIG_PATH.read_text())
+BASE_MODEL = SERVING_CONFIG["base_model"]
+BASE_MODEL_REVISION = SERVING_CONFIG["base_revision"]
 SERVED_MODEL_NAME = "medical-triage-dpo-8k"
 VLLM_HOST = "127.0.0.1"
 VLLM_PORT = 8000
