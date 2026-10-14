@@ -4,6 +4,12 @@
 
 ### Changed
 
+- Pass the selected input language from Streamlit to the shared API client and
+  explicitly mark English operational smoke requests.
+
+- Run the base CI quality gate on every pushed branch as well as pull requests;
+  deployment remains manual-only.
+
 - Preserve completed human-review status when regenerating summaries and reject
   mismatched campaign validation ledgers.
 
