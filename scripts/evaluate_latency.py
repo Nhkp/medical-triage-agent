@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics
 import sys
 import time
@@ -9,9 +10,11 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any
 from urllib.error import URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from medical_triage_agent.streamlit_interface import RejectAuthenticatedRedirects, auth_headers
 
 api: Any = import_module("medical_triage_agent.api")
 
@@ -41,6 +44,8 @@ def main() -> int:
 def run_latency_eval(*, url: str | None, iterations: int) -> dict[str, Any]:
     """Measure repeated triage calls in-process or against a remote API."""
 
+    if iterations <= 0:
+        raise ValueError("iterations must be positive")
     latencies_ms: list[float] = []
     errors = 0
     lengths: list[int] = []
@@ -74,10 +79,13 @@ def _call_remote(url: str, payload: dict[str, Any]) -> dict[str, Any]:
     request = Request(
         f"{url.rstrip('/')}/triage",
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            **auth_headers(os.environ.get("TRIAGE_API_TOKEN")),
+        },
         method="POST",
     )
-    with urlopen(request, timeout=30) as response:
+    with build_opener(RejectAuthenticatedRedirects()).open(request, timeout=120) as response:
         return json.loads(response.read().decode("utf-8"))
 
 

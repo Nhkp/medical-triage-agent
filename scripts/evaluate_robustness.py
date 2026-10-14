@@ -2,14 +2,17 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from importlib import import_module
 from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.request import Request, build_opener
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from medical_triage_agent.streamlit_interface import RejectAuthenticatedRedirects, auth_headers
 
 api: Any = import_module("medical_triage_agent.api")
 
@@ -61,9 +64,16 @@ def run_robustness_eval(*, url: str | None) -> dict[str, Any]:
     for case in CASES:
         try:
             response = _call_triage(url, case["payload"])
-        except (ValueError, OSError, TimeoutError, URLError, json.JSONDecodeError):
-            if not case.get("expect_error"):
-                failures.append(f"{case['name']}: unexpected error")
+        except HTTPError as exc:
+            if not (case.get("expect_error") and exc.code == 400):
+                failures.append(f"{case['name']}: HTTP {exc.code}")
+            continue
+        except ValueError:
+            if url or not case.get("expect_error"):
+                failures.append(f"{case['name']}: invalid response or unexpected validation error")
+            continue
+        except (OSError, TimeoutError, URLError):
+            failures.append(f"{case['name']}: transport or authentication error")
             continue
         if case.get("expect_error"):
             failures.append(f"{case['name']}: expected validation error")
@@ -72,7 +82,13 @@ def run_robustness_eval(*, url: str | None) -> dict[str, Any]:
             failures.append(
                 f"{case['name']}: expected {case.get('priority')}, got {response.get('priority')}"
             )
-        audit_record = _call_audit(url, response["audit_id"])
+        try:
+            audit_record = _call_audit(url, response.get("audit_id", ""))
+        except (OSError, ValueError, URLError):
+            failures.append(f"{case['name']}: audit retrieval failed")
+            continue
+        if not audit_record:
+            failures.append(f"{case['name']}: missing audit")
         forbidden = case.get("forbidden")
         if forbidden and forbidden in json.dumps(audit_record, ensure_ascii=False):
             failures.append(f"{case['name']}: raw PII exposed in audit")
@@ -100,26 +116,28 @@ def _call_audit(url: str | None, audit_id: str) -> dict[str, Any] | None:
 
     if not url:
         return api.audit(audit_id)
-    with urlopen(f"{url.rstrip('/')}/audit/{audit_id}", timeout=30) as response:
+    request = Request(
+        f"{url.rstrip('/')}/audit/{audit_id}",
+        headers=auth_headers(os.environ.get("TRIAGE_API_TOKEN")),
+    )
+    with build_opener(RejectAuthenticatedRedirects()).open(request, timeout=120) as response:
         return json.loads(response.read().decode("utf-8"))
 
 
 def _post_json(url: str, payload: dict[str, Any]) -> dict[str, Any]:
-    """POST JSON and convert 4xx API responses into validation errors."""
+    """POST JSON without masking authentication or transport failures."""
 
     request = Request(
         url,
         data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers={
+            "Content-Type": "application/json",
+            **auth_headers(os.environ.get("TRIAGE_API_TOKEN")),
+        },
         method="POST",
     )
-    try:
-        with urlopen(request, timeout=30) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except HTTPError as exc:
-        if 400 <= exc.code < 500:
-            raise ValueError(exc.read().decode("utf-8")) from exc
-        raise
+    with build_opener(RejectAuthenticatedRedirects()).open(request, timeout=120) as response:
+        return json.loads(response.read().decode("utf-8"))
 
 
 def _parse_args() -> argparse.Namespace:
