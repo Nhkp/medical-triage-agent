@@ -1,0 +1,59 @@
+{
+  "source_campaign": "20261008T202221Z-8k",
+  "base_model": "Qwen/Qwen3-1.7B-Base",
+  "base_revision": "ea980cb0a6c2ae4b936e82123acc929f1cec04c1",
+  "models": {
+    "sft": {
+      "repo": "Lokhidor/medical-triage-qwen3-sft-lora-8k",
+      "revision": "145c4d2d059552392da6efd0bc5977101be929e8",
+      "original_hashes": {
+        "training_args.bin": "7d537d721775087d2c0148fc73bcc6544d4f4ac930670428c32fb7518791af5d",
+        "tokenizer.json": "be75606093db2094d7cd20f3c2f385c212750648bd6ea4fb2bf507a6a4c55506",
+        "adapter_config.json": "ae9413d6203765ccef426f05aded63435b154a05a2d912d8af788827b5003503",
+        "tokenizer_config.json": "ddb9f850ca6559a928bb25d511f72e3c6eff81395334a4e0eeec670448333d09",
+        "chat_template.jinja": "87a2728cb8dc9fe424d624542f6060ec05a1d285ebbec578bb078900e33396b5",
+        "README.md": "78eb990618d555bef827bd17d33a9eec09a5bc1ced919a52a4fd9a03002ad3cf",
+        "adapter_model.safetensors": "a266b500c84abfa3de1bc9e2398b9c40aded0f0f31548ecba382567f990de0bc",
+        ".gitattributes": "34448b82c17d60fec9b65b1f093c115ddbaadc04beb1b0140b6bfed2e012a930"
+      },
+      "prompt_encoding_checksum": "ea91ee4d11f0ee498671f1b0e2d1948cd345ed614cad624aaed2f73c6c920777"
+    },
+    "dpo": {
+      "repo": "Lokhidor/medical-triage-qwen3-dpo-lora-8k",
+      "revision": "9f1c83f91064a8b464bc9e8b87f91231c617b2e7",
+      "original_hashes": {
+        "training_args.bin": "073ed3f332eec9e6f25b4e59ccad19b8a7b0b6db121a76addb8cbef69ba2fc08",
+        "tokenizer.json": "be75606093db2094d7cd20f3c2f385c212750648bd6ea4fb2bf507a6a4c55506",
+        "adapter_config.json": "ae9413d6203765ccef426f05aded63435b154a05a2d912d8af788827b5003503",
+        "tokenizer_config.json": "ddb9f850ca6559a928bb25d511f72e3c6eff81395334a4e0eeec670448333d09",
+        "chat_template.jinja": "87a2728cb8dc9fe424d624542f6060ec05a1d285ebbec578bb078900e33396b5",
+        "README.md": "f1b9b0c9e3fccc7c98df88bd2109244db8462a9f5c102bedf9232d59604e20f9",
+        "adapter_model.safetensors": "e3c44dac8e529ee47291349bc0bdf905cac02a7e7f23f5ebf0ab80a125cd37c8",
+        ".gitattributes": "34448b82c17d60fec9b65b1f093c115ddbaadc04beb1b0140b6bfed2e012a930"
+      },
+      "prompt_encoding_checksum": "ea91ee4d11f0ee498671f1b0e2d1948cd345ed614cad624aaed2f73c6c920777"
+    }
+  },
+  "chat_template_checksum": "87a2728cb8dc9fe424d624542f6060ec05a1d285ebbec578bb078900e33396b5",
+  "generation": {
+    "seed": 42,
+    "temperature": 0,
+    "max_tokens": 256,
+    "repetition_penalty": 1.1,
+    "system_prompt": "You support clinical staff in a CHSA medical triage proof of concept. Suggest a priority from the declared symptoms. Backend rules retain final authority. Return exactly one JSON object and nothing else.\n\nSchema:\n{\n  \"suggested_priority\": \"urgence_maximale\" | \"moderee\" | \"differee\",\n  \"explanation\": \"...\",\n  \"confidence\": 0.0-1.0\n}\n\nExplanation rules:\n- Use the input language, French or English, with Latin script only.\n- Write 2 short sentences, or 3 for urgence_maximale; aim for at most 60 words.\n- Each sentence must add different information. Do not repeat sentences or blocks.\n- Use only declared symptoms; do not invent symptoms, diagnoses, diseases, or complications.\n- Do not provide diagnosis, medication, dosage, home treatment, or discharge instructions.\n- Explain the priority, acknowledge uncertainty, and require human clinical confirmation.\n- After the explanation, complete the JSON and stop. No markdown or extra text.",
+    "structured_output": "guided_json",
+    "chat_template_checksum": "87a2728cb8dc9fe424d624542f6060ec05a1d285ebbec578bb078900e33396b5"
+  },
+  "base_hashes": {
+    "merges.txt": "8831e4f1a044471340f7c0a83d7bd71306a5b867e95fd870f74d0c5308a904d5",
+    "generation_config.json": "8c970692323e3ea0e9b8b0a4dca79388d31226e41f83c9fd6014804280ebf6e8",
+    "LICENSE": "832dd9e00a68dd83b3c3fb9f5588dad7dcf337a0db50f7d9483f310cd292e92e",
+    "config.json": "1bb33a92c3548fbc68b889b490e810440435253598835bd71dff0396060c12db",
+    "tokenizer.json": "c0382117ea329cdf097041132f6d735924b697924d6f6fc3945713e96ce87539",
+    "tokenizer_config.json": "3c04ed3ca964ea2f6b2b5faf0dc4d31aec1cb1e8b4bcf63f402d295046b422b5",
+    "README.md": "579b9d7052fa567f439114f01feceed2b06f47d830d06c8ac829f389fd2e39a4",
+    "model.safetensors": "6df85b39330e5a425ee36253d0f894e4387e4f0a15b9c53cb467d668e6b3a841",
+    ".gitattributes": "11ad7efa24975ee4b0c3c3a38ed18737f0658a5f75a0a96787b576a78a023361",
+    "vocab.json": "ca10d7e9fb3ed18575dd1e277a2579c16d108e32f27439684afa0e10b1440910"
+  }
+}

@@ -7,6 +7,9 @@ import subprocess
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from importlib import metadata
+from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from urllib.error import URLError
 from urllib.request import urlopen
@@ -21,6 +24,10 @@ BASE_MODEL = "Qwen/Qwen3-1.7B-Base"
 BASE_MODEL_REVISION = "ea980cb0a6c2ae4b936e82123acc929f1cec04c1"
 ADAPTER_REPO = "Lokhidor/medical-triage-qwen3-dpo-lora-8k"
 ADAPTER_REVISION = "9f1c83f91064a8b464bc9e8b87f91231c617b2e7"
+CONFIG_PATH = Path("/app/configs/serving.json")
+if not CONFIG_PATH.exists():
+    CONFIG_PATH = Path(__file__).resolve().parents[1] / "configs/serving.json"
+SERVING_CONFIG = json.loads(CONFIG_PATH.read_text())
 SERVED_MODEL_NAME = "medical-triage-dpo-8k"
 VLLM_HOST = "127.0.0.1"
 VLLM_PORT = 8000
@@ -45,6 +52,10 @@ image = (
     .workdir("/app")
     .env({"HF_HUB_ENABLE_HF_TRANSFER": "1", "PYTHONPATH": "/app/src"})
     .add_local_dir("src", remote_path="/app/src")
+    .add_local_dir("configs", remote_path="/app/configs")
+    .add_local_file(
+        "tests/fixtures/triage_calibration.jsonl", remote_path="/app/triage_calibration.jsonl"
+    )
 )
 
 app = modal.App(APP_NAME)
@@ -71,9 +82,10 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
 
 def build_vllm_command(
     *,
-    base_model: str = BASE_MODEL,
+    base_model: str = "/app/assets/base",
     base_model_revision: str = BASE_MODEL_REVISION,
-    adapter_repo: str = ADAPTER_REPO,
+    adapter_repo: str = "/app/assets/dpo",
+    chat_template: str = "/app/assets/chat_template.jinja",
     served_model_name: str = SERVED_MODEL_NAME,
     host: str = VLLM_HOST,
     port: int = VLLM_PORT,
@@ -94,7 +106,7 @@ def build_vllm_command(
         build_lora_module_spec(
             name=served_model_name,
             path=adapter_repo,
-            base_model_name=base_model,
+            base_model_name=BASE_MODEL,
         ),
         "--served-model-name",
         served_model_name,
@@ -106,6 +118,10 @@ def build_vllm_command(
         str(max_model_len),
         "--gpu-memory-utilization",
         gpu_memory_utilization,
+        "--chat-template",
+        chat_template,
+        "--tokenizer",
+        adapter_repo,
     ]
     command.append("--enforce-eager" if fast_boot else "--no-enforce-eager")
     return command
@@ -114,8 +130,6 @@ def build_vllm_command(
 def build_lora_module_spec(*, name: str, path: str, base_model_name: str) -> str:
     """Build the vLLM LoRA module spec with parent model lineage."""
 
-    # ponytail: vLLM static LoRA specs do not expose a separate revision field; keep
-    # the adapter SHA documented and add CLI support here if vLLM grows that option.
     return json.dumps(
         {"name": name, "path": path, "base_model_name": base_model_name},
         separators=(",", ":"),
@@ -134,7 +148,97 @@ def build_runtime_env(
         "PYTHONPATH": "/app/src",
         "VLLM_BASE_URL": f"http://{host}:{port}/v1",
         "VLLM_MODEL_ID": served_model_name,
+        "VLLM_STRUCTURED_OUTPUT": "guided_json",
+        "VLLM_MAX_TOKENS": "256",
     }
+
+
+def prepare_serving_assets(directory: Path = Path("/app/assets")) -> dict[str, str]:
+    """Resolve pinned snapshots and qualify tokenizer assets before GPU serving."""
+
+    from huggingface_hub import snapshot_download
+
+    from medical_triage_agent.tokenizer_compatibility import checksum, prepare_adapter_compatibility
+    from medical_triage_agent.triage import assess_triage
+    from medical_triage_agent.vllm_client import build_chat_request
+
+    versions = {
+        name: metadata.version(name) for name in ("vllm", "transformers", "torch", "fastapi")
+    }
+    if versions["vllm"] != "0.10.2" or versions["transformers"] != "4.56.2":
+        raise ValueError("Serving requires vLLM 0.10.2 and Transformers 4.56.2")
+    directory.mkdir(parents=True, exist_ok=True)
+    base = Path(snapshot_download(BASE_MODEL, revision=BASE_MODEL_REVISION))
+    for name, expected in SERVING_CONFIG["base_hashes"].items():
+        if checksum(base / name) != expected:
+            raise ValueError(f"Base snapshot asset differs: {name}")
+    originals = {}
+    for model, config in SERVING_CONFIG["models"].items():
+        source = Path(
+            snapshot_download(
+                config["repo"],
+                revision=config["revision"],
+                allow_patterns=list(config["original_hashes"]),
+            )
+        )
+        for name, expected in config["original_hashes"].items():
+            if checksum(source / name) != expected:
+                raise ValueError(f"{model} snapshot asset differs: {name}")
+        originals[model] = source
+    template = originals["sft"] / "chat_template.jinja"
+    if checksum(template) != SERVING_CONFIG["chat_template_checksum"]:
+        raise ValueError("Chat template differs from the evaluated campaign")
+    fixture = Path("/app/triage_calibration.jsonl")
+    if not fixture.exists():
+        fixture = CONFIG_PATH.parents[1] / "tests/fixtures/triage_calibration.jsonl"
+    cases = [SimpleNamespace(**json.loads(line)) for line in fixture.read_text().splitlines()]
+    proofs = {}
+    for model, source in originals.items():
+        proof = prepare_adapter_compatibility(
+            source, directory / model, cases, template.read_text()
+        )
+        if (
+            proof["prompt_encoding_checksum"]
+            != SERVING_CONFIG["models"][model]["prompt_encoding_checksum"]
+        ):
+            raise ValueError(f"{model} prompt encoding differs from campaign")
+        proofs[model] = proof
+    request = build_chat_request(
+        {"symptoms": cases[0].symptoms, "language": cases[0].language},
+        assess_triage({"symptoms": cases[0].symptoms}),
+    )
+    for name in ("seed", "temperature", "max_tokens", "repetition_penalty"):
+        if request[name] != SERVING_CONFIG["generation"][name]:
+            raise ValueError(f"Generation parameter differs from campaign: {name}")
+    if (
+        "guided_json" not in request
+        or request["messages"][0]["content"] != SERVING_CONFIG["generation"]["system_prompt"]
+    ):
+        raise ValueError("Structured output or system prompt differs from campaign")
+    paths = {
+        "base_model": str(base),
+        "adapter_repo": str(directory / "dpo"),
+        "chat_template": str(template),
+    }
+    evidence = {
+        "config": SERVING_CONFIG,
+        "paths": paths,
+        "tokenizers": proofs,
+        "versions": versions,
+    }
+    (directory / "serving_manifest.json").write_text(json.dumps(evidence, indent=2) + "\n")
+    print(
+        json.dumps(
+            {
+                "serving_revisions": {
+                    k: v["revision"] for k, v in SERVING_CONFIG["models"].items()
+                },
+                "base_revision": BASE_MODEL_REVISION,
+                "manifest": str(directory / "serving_manifest.json"),
+            }
+        )
+    )
+    return paths
 
 
 def create_authenticated_api_app() -> Any:
@@ -156,7 +260,7 @@ def wait_for_vllm(timeout_seconds: int = VLLM_STARTUP_TIMEOUT_SECONDS) -> None:
     while time.monotonic() < deadline:
         try:
             with urlopen(url, timeout=5) as response:
-                if 200 <= response.status < 500:
+                if response.status == 200:
                     return
         except (OSError, TimeoutError, URLError) as exc:
             last_error = str(exc)
@@ -168,7 +272,7 @@ def start_vllm_process() -> subprocess.Popen[Any]:
     """Start vLLM with the Modal serving environment."""
 
     os.environ.update(build_runtime_env())
-    return subprocess.Popen(build_vllm_command())
+    return subprocess.Popen(build_vllm_command(**prepare_serving_assets()))
 
 
 def terminate_process(process: subprocess.Popen[Any]) -> None:
