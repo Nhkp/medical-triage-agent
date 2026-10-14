@@ -71,3 +71,15 @@ def test_remote_evaluators_authenticate_triage_and_audit(monkeypatch: Any) -> No
             module._call_triage("https://api.test", {"symptoms": ["fatigue"]})
             module._call_audit("https://api.test", "id")
     assert len(requests) == 3
+
+
+def test_operational_quantiles_use_interpolation_and_handle_small_samples() -> None:
+    module = importlib.import_module("scripts.evaluate_latency")
+    assert module._percentile([], 95) == 0.0
+    assert module._percentile([7.0], 95) == 7.0
+    assert module._percentile([1.0, 4.0], 0) == 1.0
+    assert module._percentile([1.0, 4.0], 100) == 4.0
+    with pytest.raises(ValueError, match="between"):
+        module._percentile([1.0], 101)
+    assert module._percentile([1.0, 2.0, 3.0, 4.0], 50) == 2.5
+    assert module._percentile([1.0, 2.0, 3.0, 4.0], 95) == 3.85

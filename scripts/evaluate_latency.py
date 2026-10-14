@@ -90,13 +90,17 @@ def _call_remote(url: str, payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def _percentile(values: list[float], percentile: int) -> float:
-    """Return a rounded nearest-rank percentile for latency samples."""
+    """Return a rounded sample quantile for operational smoke latency."""
 
+    if not 0 <= percentile <= 100:
+        raise ValueError("percentile must be between 0 and 100")
     if not values:
         return 0.0
-    ordered = sorted(values)
-    index = min(len(ordered) - 1, round((percentile / 100) * (len(ordered) - 1)))
-    return round(ordered[index], 3)
+    if percentile in {0, 100}:
+        return round(min(values) if percentile == 0 else max(values), 3)
+    if len(values) == 1:
+        return round(values[0], 3)
+    return round(statistics.quantiles(values, n=100, method="inclusive")[percentile - 1], 3)
 
 
 def _parse_args() -> argparse.Namespace:

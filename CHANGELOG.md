@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Use inclusive interpolated quantiles for operational latency smoke checks, including
+  single-sample handling; historical campaign measurements remain unchanged.
+
 - Keep the comparison notebook independent of incidental script imports after
   sharing tokenizer helpers; verify its helper references before GPU execution.
 
