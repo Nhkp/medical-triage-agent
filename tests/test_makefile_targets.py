@@ -23,20 +23,17 @@ def test_makefile_exposes_data_preparation_targets() -> None:
         "data-summary-8k:",
         "train-sft-smoke:",
         "train-dpo-smoke:",
-        "train-grpo-smoke:",
         "train-5k:",
         "train-8k:",
         "pipeline-5k:",
         "pipeline-8k:",
         "pipeline-all:",
         "mlflow-ui:",
-        "eval-models:",
         "eval-model-comparison-dry-run:",
         "eval-model-comparison:",
         "serve-local:",
         "serve-api:",
         "serve-ui:",
-        "serve-colab-dry-run:",
         "serve-kaggle-dry-run:",
         "eval-latency:",
         "eval-robustness:",
@@ -49,7 +46,6 @@ def test_makefile_exposes_data_preparation_targets() -> None:
     assert "summarize-training-data" in makefile
     assert "scripts/train_sft.py" in makefile
     assert "scripts/train_dpo.py" in makefile
-    assert "scripts/train_grpo.py" in makefile
     assert "scripts/train_experiment.py" in makefile
     assert "HF_DATASET_REPO_5K ?= Lokhidor/medical-triage-dataset" in makefile
     assert "HF_DATASET_REPO_8K ?= Lokhidor/medical-triage-dataset-8k" in makefile
@@ -59,8 +55,7 @@ def test_makefile_exposes_data_preparation_targets() -> None:
     assert "--mlflow-ngrok --mlflow-ui-port $(MLFLOW_UI_PORT)" in makefile
     assert "MLFLOW_TRACKING_URI ?= sqlite:///mlflow.db" in makefile
     assert "mlflow ui --backend-store-uri $(MLFLOW_TRACKING_URI)" in makefile
-    assert "scripts/evaluate.py" in makefile
     assert "scripts/evaluate_model_comparison.py" in makefile
     assert "scripts/evaluate_latency.py" in makefile
     assert "scripts/evaluate_robustness.py" in makefile
-    assert "scripts/serve_colab.py" in makefile
+    assert "scripts/serve_notebook.py" in makefile

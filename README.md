@@ -59,7 +59,7 @@ demonstration API with audit metadata and safety evaluation.
   obvious PII findings for generated data.
 - The API scaffold exposes `/health`, `/triage`, and `/audit/{id}` with metadata-only audit
   responses, optional vLLM priority suggestions, and backend safety arbitration.
-- SFT, DPO, and optional GRPO scripts have YAML configs and CPU-safe dry-run smoke commands
+- SFT and DPO scripts have YAML configs and CPU-safe dry-run smoke commands
   before full GPU jobs.
 
 ## Reproducibility
@@ -155,8 +155,6 @@ Validate Kaggle training and model-evaluation startup without loading weights:
 ```bash
 make train-sft-smoke
 make train-dpo-smoke
-make train-grpo-smoke
-make eval-models
 ```
 
 ## Model comparison on Kaggle
@@ -226,7 +224,6 @@ uncertainty, escalation rules, and safety disclaimers.
 - [`docs/medical-safety.md`](docs/medical-safety.md): medical safety boundaries.
 - [`docs/evaluation.md`](docs/evaluation.md): evaluation policy and acceptance targets.
 - [`docs/kaggle-workflow.md`](docs/kaggle-workflow.md): free-GPU QLoRA workflow.
-- [`docs/colab-workflow.md`](docs/colab-workflow.md): Colab T4 QLoRA workflow.
 - [`docs/report.md`](docs/report.md): longer technical report scaffold.
 
 ## School deliverables

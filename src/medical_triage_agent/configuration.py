@@ -16,7 +16,7 @@ class ConfigurationError(ValueError):
 class TrainingConfig:
     """Validated training configuration plus helpers for common sections."""
 
-    method: Literal["sft", "dpo", "grpo"]
+    method: Literal["sft", "dpo"]
     values: dict[str, Any]
 
     def section(self, name: str) -> dict[str, Any]:
@@ -70,7 +70,7 @@ class TrainingConfig:
 def load_training_config(
     path: str | Path,
     *,
-    method: Literal["sft", "dpo", "grpo"],
+    method: Literal["sft", "dpo"],
     overrides: dict[str, Any] | None = None,
     require_files: bool = True,
 ) -> TrainingConfig:
@@ -120,9 +120,6 @@ def validate_training_config(config: TrainingConfig, *, require_files: bool = Tr
         _required_path(data, "train_file", require_files)
         _required_path(data, "validation_file", require_files)
         _positive_number(config.section("dpo").get("beta"), "dpo.beta")
-    elif config.method == "grpo":
-        _required_path(data, "train_file", require_files)
-        _positive_number(config.section("grpo").get("beta"), "grpo.beta")
 
 
 def _load_yaml_mapping(path: Path) -> dict[str, Any]:

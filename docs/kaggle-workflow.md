@@ -1,6 +1,6 @@
 # Kaggle free-GPU workflow
 
-This workflow is the low-VRAM execution path for CHSA SFT, DPO, and the optional GRPO POC.
+This workflow is the low-VRAM execution path for CHSA SFT and DPO.
 Hugging Face remains the publication target for datasets, adapters, and cards.
 
 ## Environment
@@ -32,8 +32,6 @@ Validate the config and script startup without loading models:
 ```bash
 make train-sft-smoke
 make train-dpo-smoke
-make train-grpo-smoke
-make eval-models
 ```
 
 Then run the smallest real SFT job:
@@ -49,24 +47,11 @@ Run DPO only after SFT has produced an adapter:
 uv run scripts/train_dpo.py --config configs/dpo.yaml --max-steps 5 --max-train-samples 32
 ```
 
-GRPO is optional and should stay a proof of concept unless SFT and DPO are already working:
-
-```bash
-uv run scripts/train_grpo.py --config configs/grpo.yaml --max-steps 5 --max-train-samples 16
-```
-
 ## Evaluation
 
-Use deterministic decoding for model comparisons:
-
-```bash
-uv run scripts/evaluate.py --config configs/sft.yaml --model base --output outputs/evaluations/base.json
-uv run scripts/evaluate.py --config configs/sft.yaml --model sft --adapter-path outputs/sft --output outputs/evaluations/sft.json
-uv run scripts/evaluate.py --config configs/sft.yaml --model dpo --adapter-path outputs/dpo --output outputs/evaluations/dpo.json
-```
-
-Automatic metrics are technical indicators only. They do not prove clinical safety or
-readiness for deployment.
+The official comparison uses `notebooks/kaggle_model_comparison.ipynb` and
+`scripts/evaluate_model_comparison.py`, with one served model per execution.
+See `docs/evaluation.md` for pinned assets, preflight, repetitions and review.
 
 ## Publication
 

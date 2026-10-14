@@ -10,4 +10,4 @@ Maintain the FastAPI wrapper, vLLM serving contract, Docker image, and audit beh
 - Do not log raw patient text in audit responses.
 - Require an API key for deployed demo endpoints.
 - Keep health checks lightweight.
-- Containerize serving only; training stays in Hugging Face Jobs.
+- Containerize serving only; training stays in Kaggle.

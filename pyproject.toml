@@ -31,7 +31,6 @@ training = [
     "mlflow>=3.0.0",
     "peft>=0.17.0",
     "pyyaml>=6.0.0",
-    "trackio>=0.2.0",
     "transformers>=4.56.0",
     "trl>=1.0.0",
 ]

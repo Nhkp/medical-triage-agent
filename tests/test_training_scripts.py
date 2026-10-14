@@ -11,8 +11,6 @@ def test_training_scripts_support_cpu_safe_dry_run() -> None:
     commands = (
         ["uv", "run", "scripts/train_sft.py", "--config", "configs/sft.yaml", "--dry-run"],
         ["uv", "run", "scripts/train_dpo.py", "--config", "configs/dpo.yaml", "--dry-run"],
-        ["uv", "run", "scripts/train_grpo.py", "--config", "configs/grpo.yaml", "--dry-run"],
-        ["uv", "run", "scripts/evaluate.py", "--config", "configs/sft.yaml", "--dry-run"],
     )
 
     for command in commands:
@@ -79,7 +77,6 @@ def test_training_scripts_accept_hub_model_id_override() -> None:
     commands = (
         ["uv", "run", "scripts/train_sft.py", "--config", "configs/sft.yaml"],
         ["uv", "run", "scripts/train_dpo.py", "--config", "configs/dpo.yaml"],
-        ["uv", "run", "scripts/train_grpo.py", "--config", "configs/grpo.yaml"],
     )
 
     for command in commands:

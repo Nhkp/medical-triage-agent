@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Recenter the supported workflow on Kaggle SFT/DPO, Modal and Streamlit; remove
+  unused platform variants and duplicate UI code, and pin the local vLLM image.
+
 - Finalise the English school report and 14-slide defence deck around the executed
   8k comparison and recorded Modal deployment; distinguish technical acceptance from
   safety, preserve historical evidence, and integrate user validation of all 144 AI-assisted

@@ -9,23 +9,12 @@
    Hugging Face dataset repo.
 5. Add a dataset card with source IDs, licenses, transforms, and known limits.
 
-## Training jobs
+## Training and publication
 
-Use Hugging Face Jobs with `HF_TOKEN` passed as a secret. Job environments are ephemeral, so
-scripts must push checkpoints and final adapters to the Hub.
-
-Recommended smoke run:
-
-```bash
-uv run scripts/train_sft.py --config configs/sft.yaml --max-steps 5 --dry-run
-uv run scripts/train_dpo.py --config configs/dpo.yaml --max-steps 5 --dry-run
-```
-
-For managed jobs, upload or inline the script, use `a10g-large` as the default Qwen3-1.7B
-LoRA development target, and set a timeout of at least two hours for non-smoke runs.
-
-For free-GPU execution, use `docs/kaggle-workflow.md`. Kaggle is the memory-constrained
-experimentation path; Hugging Face remains the dataset and adapter publication target.
+Training runs on Kaggle through the SFT/DPO scripts and notebook. Hugging Face is
+used for versioned dataset and adapter storage; it is not the project compute platform.
+Keep `HF_TOKEN` in Kaggle secrets and publish only to an explicit repository.
+See `docs/kaggle-workflow.md` for execution and `docs/evaluation.md` for pinned revisions.
 
 ## Local dataset commands
 

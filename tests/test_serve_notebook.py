@@ -7,8 +7,8 @@ from pathlib import Path
 from typing import Any
 
 
-def test_serve_colab_dry_run_commands_are_colab_friendly() -> None:
-    module = _load_script("serve_colab", Path("scripts/serve_colab.py"))
+def test_serve_notebook_dry_run_commands_are_colab_friendly() -> None:
+    module = _load_script("serve_notebook", Path("scripts/serve_notebook.py"))
     args = argparse.Namespace(
         model=None,
         base_model="Qwen/Qwen3-1.7B-Base",

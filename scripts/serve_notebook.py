@@ -14,7 +14,7 @@ from urllib.request import urlopen
 
 
 def main() -> int:
-    """Launch vLLM and FastAPI processes for an interactive Colab serving session."""
+    """Launch vLLM and FastAPI processes for an interactive Kaggle serving session."""
 
     args = _parse_args()
     repo_root = Path(__file__).resolve().parents[1]
@@ -147,7 +147,7 @@ def _summary(args: argparse.Namespace, public_url: str | None) -> str:
     base_url = public_url or f"http://{args.host}:{args.api_port}"
     return "\n".join(
         [
-            "Colab serving is ready.",
+            "Kaggle serving is ready.",
             f"FastAPI: {base_url}",
             f"Health:  {base_url}/health",
             "Example:",
@@ -181,9 +181,9 @@ def _terminate(process: subprocess.Popen[str]) -> None:
 
 
 def _parse_args() -> argparse.Namespace:
-    """Parse CLI arguments for Colab serving."""
+    """Parse CLI arguments for Kaggle serving."""
 
-    parser = argparse.ArgumentParser(description="Serve vLLM + FastAPI from a Colab GPU runtime")
+    parser = argparse.ArgumentParser(description="Serve vLLM + FastAPI from a Kaggle GPU runtime")
     parser.add_argument("--model", help="Backward-compatible alias for --adapter")
     parser.add_argument("--base-model", help="Hugging Face base model loaded by vLLM")
     parser.add_argument("--adapter", help="Hugging Face LoRA adapter repo served by vLLM")

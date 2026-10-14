@@ -41,7 +41,7 @@ API_URL ?=
 EVAL_MODEL ?= base
 EVAL_CAMPAIGN ?= outputs/evaluations
 
-.PHONY: sync sync-training sync-ui sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean data-pull-5k data-pull-8k data-audit-5k data-audit-8k data-summary-5k data-summary-8k train-sft-smoke train-dpo-smoke train-grpo-smoke train-5k train-8k pipeline-5k pipeline-8k pipeline-all mlflow-ui deploy deploy-dry-run eval-models eval-model-comparison-dry-run eval-model-comparison serve-local serve-api serve-ui serve-colab-dry-run serve-kaggle-dry-run eval-latency eval-robustness step3-ready presentation-browser presentation-html presentation-pptx presentation-ready clean
+.PHONY: sync sync-training sync-ui sync-presentation check lint format type test hooks hooks-run data-build data-audit data-card data-summary data-ready data-clean data-pull-5k data-pull-8k data-audit-5k data-audit-8k data-summary-5k data-summary-8k train-sft-smoke train-dpo-smoke train-5k train-8k pipeline-5k pipeline-8k pipeline-all mlflow-ui deploy deploy-dry-run eval-model-comparison-dry-run eval-model-comparison serve-local serve-api serve-ui serve-kaggle-dry-run eval-latency eval-robustness step3-ready presentation-browser presentation-html presentation-pptx presentation-ready clean
 
 # Install the default project dependencies.
 sync:
@@ -143,10 +143,6 @@ train-sft-smoke:
 train-dpo-smoke:
 	uv run scripts/train_dpo.py --config configs/dpo.yaml --max-steps 5 --dry-run
 
-# Validate optional GRPO training startup without loading model weights.
-train-grpo-smoke:
-	uv run scripts/train_grpo.py --config configs/grpo.yaml --max-steps 5 --dry-run
-
 # Train the 5k SFT+DPO MLflow experiment from DATA_OUT_5K.
 train-5k: sync-training
 	uv run scripts/train_experiment.py --dataset-label dataset-5k --dataset-dir $(DATA_OUT_5K) --dataset-repo $(HF_DATASET_REPO_5K) --mlflow-tracking-uri $(MLFLOW_TRACKING_URI) --mlflow-experiment-name $(MLFLOW_EXPERIMENT_NAME) --sft-hub-model-id $(SFT_HUB_MODEL_ID_5K) --dpo-hub-model-id $(DPO_HUB_MODEL_ID_5K) $(PUSH_TO_HUB_ARG) $(MLFLOW_NGROK_ARG)
@@ -176,10 +172,6 @@ deploy:
 deploy-dry-run:
 	uv run python scripts/deploy_modal.py --dry-run
 
-# Dry-run the base model evaluation startup.
-eval-models:
-	uv run scripts/evaluate.py --config configs/sft.yaml --model base --dry-run
-
 # Dry-run model comparison output generation without calling a live API.
 eval-model-comparison-dry-run:
 	uv run python scripts/evaluate_model_comparison.py --dry-run
@@ -200,13 +192,9 @@ serve-api:
 serve-ui:
 	uv run --extra ui streamlit run src/medical_triage_agent/streamlit_interface.py
 
-# Validate the Colab serving command construction without starting vLLM.
-serve-colab-dry-run:
-	uv run python scripts/serve_colab.py --dry-run
-
 # Validate the Kaggle serving command construction without starting vLLM.
 serve-kaggle-dry-run:
-	uv run python scripts/serve_colab.py --dry-run
+	uv run python scripts/serve_notebook.py --dry-run
 
 # Run latency evaluation against API_URL when provided.
 eval-latency:

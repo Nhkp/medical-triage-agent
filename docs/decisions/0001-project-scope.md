@@ -2,12 +2,12 @@
 
 ## Status
 
-Accepted.
+Historical decision; platform choice superseded by the Kaggle/Modal school delivery.
 
 ## Decision
 
 This repository targets a 4-week proof of concept for a CHSA medical triage assistant. The
-default platform is Hugging Face Hub/Jobs for dataset, model, training, and artifact
+initial default platform was Hugging Face Hub/Jobs for dataset, model, training, and artifact
 reproducibility. The target model is Qwen3-1.7B-Base with SFT, LoRA, and DPO alignment.
 
 ## Consequences
