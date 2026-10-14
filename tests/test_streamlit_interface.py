@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 from email.message import Message
+from types import SimpleNamespace
 from typing import Any, Self
 from urllib.error import HTTPError, URLError
 
@@ -87,7 +88,7 @@ def test_request_json_sends_bearer_token_when_provided(monkeypatch: Any) -> None
         assert request.get_header("Authorization") == "Bearer secret-token"
         return _Response(b'{"priority": "moderee"}')
 
-    monkeypatch.setattr(ui, "urlopen", fake_urlopen)
+    monkeypatch.setattr(ui, "build_opener", lambda *_args: SimpleNamespace(open=fake_urlopen))
 
     result = ui.request_json(
         "POST",
@@ -170,3 +171,38 @@ def test_render_triage_warns_when_rules_override_llm(monkeypatch: Any) -> None:
         "Backend safety rules overrode a lower LLM priority suggestion.",
     ) in fake.messages
     assert ("code", "audit_test") in fake.messages
+
+
+def test_server_token_cannot_be_sent_to_a_visitor_url(monkeypatch: Any) -> None:
+    monkeypatch.setenv("TRIAGE_API_TOKEN", "server-secret")
+    monkeypatch.setenv("MODAL_API_URL", "https://trusted.test")
+    result = ui.request_json(
+        "POST", "https://visitor.test", "/triage", bearer_token="server-secret"
+    )
+    assert not result.ok
+    assert "restricted" in str(result.error)
+
+
+def test_authenticated_redirect_is_refused() -> None:
+    from urllib.request import Request
+
+    import pytest
+
+    with pytest.raises(HTTPError, match="redirect refused"):
+        ui.RejectAuthenticatedRedirects().redirect_request(
+            Request("https://trusted.test", headers={"Authorization": "Bearer synthetic"}),
+            None,
+            302,
+            "Found",
+            Message(),
+            "https://visitor.test",
+        )
+
+
+def test_cloud_entrypoint_runs_shared_implementation(monkeypatch: Any) -> None:
+    import runpy
+
+    calls = []
+    monkeypatch.setattr(ui, "run_app", lambda: calls.append(True))
+    runpy.run_path("streamlit_interface.py", run_name="__main__")
+    assert calls == [True]

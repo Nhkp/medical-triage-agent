@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from importlib import import_module
 from typing import Any
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
+from urllib.parse import urlsplit
+from urllib.request import HTTPRedirectHandler, Request, build_opener, urlopen
 
 DEFAULT_API_URL = "http://127.0.0.1:8080"
 MODAL_API_URL_ENV = "MODAL_API_URL"
@@ -47,6 +48,15 @@ def auth_headers(token: str | None) -> dict[str, str]:
     return {"Authorization": f"Bearer {token.strip()}"} if token and token.strip() else {}
 
 
+class RejectAuthenticatedRedirects(HTTPRedirectHandler):
+    """Never forward a bearer credential through a redirect."""
+
+    def redirect_request(
+        self, req: Request, fp: Any, code: int, msg: str, headers: Any, newurl: str
+    ) -> None:
+        raise HTTPError(req.full_url, code, "Authenticated redirect refused", headers, fp)
+
+
 def request_json(
     method: str,
     base_url: str,
@@ -57,6 +67,16 @@ def request_json(
 ) -> ApiResult:
     """Send a JSON request to the triage API and normalize success/error results."""
 
+    if bearer_token:
+        target = urlsplit(base_url)
+        if target.scheme not in {"http", "https"} or not target.hostname or target.username:
+            return ApiResult(ok=False, error="Invalid authenticated API URL")
+        if os.environ.get(TRIAGE_API_TOKEN_ENV) and base_url.rstrip(
+            "/"
+        ) != default_api_url().rstrip("/"):
+            return ApiResult(
+                ok=False, error="Server credential is restricted to the configured API"
+            )
     body = json.dumps(payload).encode("utf-8") if payload is not None else None
     request = Request(
         endpoint_url(base_url, path),
@@ -65,7 +85,10 @@ def request_json(
         headers={"Content-Type": "application/json", **auth_headers(bearer_token)},
     )
     try:
-        with urlopen(request, timeout=timeout) as response:
+        open_request = (
+            build_opener(RejectAuthenticatedRedirects()).open if bearer_token else urlopen
+        )
+        with open_request(request, timeout=timeout) as response:
             return ApiResult(
                 ok=True,
                 data=json.loads(response.read().decode("utf-8")),
@@ -97,8 +120,10 @@ def run_app() -> None:
     st.title("CHSA triage API tester")
     st.caption("Optional Streamlit console for the FastAPI/vLLM proof of concept.")
 
-    api_url = st.sidebar.text_input("API base URL", value=default_api_url())
     bearer_token = os.environ.get(TRIAGE_API_TOKEN_ENV, "")
+    api_url = st.sidebar.text_input(
+        "API base URL", value=default_api_url(), disabled=bool(bearer_token)
+    )
     st.sidebar.caption(
         "Use localhost for local FastAPI, or your Modal API URL. No client timeout is applied."
     )
