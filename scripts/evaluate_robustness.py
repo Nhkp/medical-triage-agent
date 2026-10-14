@@ -26,7 +26,7 @@ CASES: tuple[dict[str, Any], ...] = (
     },
     {
         "name": "english red flag escalates",
-        "payload": {"symptoms": ["shortness of breath"]},
+        "payload": {"symptoms": ["shortness of breath"], "language": "en"},
         "priority": "urgence_maximale",
     },
     {

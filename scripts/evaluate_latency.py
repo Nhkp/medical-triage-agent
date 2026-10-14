@@ -22,8 +22,8 @@ api: Any = import_module("medical_triage_agent.api")
 CASES: tuple[dict[str, Any], ...] = (
     {"symptoms": ["douleur thoracique", "essoufflement"]},
     {"symptoms": ["fatigue", "fievre moderee"]},
-    {"symptoms": ["chest pain", "shortness of breath"]},
-    {"symptoms": ["headache", "nausea"]},
+    {"symptoms": ["chest pain", "shortness of breath"], "language": "en"},
+    {"symptoms": ["headache", "nausea"], "language": "en"},
 )
 
 

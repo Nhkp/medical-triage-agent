@@ -136,6 +136,7 @@ def run_app() -> None:
         value="douleur thoracique\ndifficulte respiratoire",
         help="One symptom per line. Do not enter identifiable patient data.",
     )
+    language = st.selectbox("Input language", options=["fr", "en"])
     symptoms = parse_symptoms(symptoms_text)
 
     if st.button("Analyze triage", type="primary"):
@@ -147,7 +148,7 @@ def run_app() -> None:
                     "POST",
                     api_url,
                     "/triage",
-                    {"symptoms": symptoms},
+                    {"symptoms": symptoms, "language": language},
                     bearer_token=bearer_token,
                 )
             )
