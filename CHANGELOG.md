@@ -4,8 +4,13 @@
 
 ### Changed
 
+- Restrict server UI credentials to the configured endpoint, refuse authenticated redirects,
+  and authenticate remote smoke checks without masking HTTP or missing-audit failures.
+- Qualify pinned Modal snapshots against the evaluated hashes and shared tokenizer conversion,
+  with an explicit chat template and generation-parameter checks before serving.
+
 - Recenter the supported workflow on Kaggle SFT/DPO, Modal and Streamlit; remove
-  unused platform variants and duplicate UI code, and pin the local vLLM image.
+  unused platform variants, obsolete metrics and duplicate UI code, and pin the local vLLM image.
 
 - Finalise the English school report and 14-slide defence deck around the executed
   8k comparison and recorded Modal deployment; distinguish technical acceptance from

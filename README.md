@@ -57,7 +57,7 @@ demonstration API with audit metadata and safety evaluation.
   clinical review queue, and a generated dataset card under `data/processed/training`.
 - `make data-audit` validates schema, provenance, duplicate content, split isolation, and
   obvious PII findings for generated data.
-- The API scaffold exposes `/health`, `/triage`, and `/audit/{id}` with metadata-only audit
+- The API exposes `/health`, `/triage`, and `/audit/{id}` with metadata-only audit
   responses, optional vLLM priority suggestions, and backend safety arbitration.
 - SFT and DPO scripts have YAML configs and CPU-safe dry-run smoke commands
   before full GPU jobs.
@@ -224,7 +224,7 @@ uncertainty, escalation rules, and safety disclaimers.
 - [`docs/medical-safety.md`](docs/medical-safety.md): medical safety boundaries.
 - [`docs/evaluation.md`](docs/evaluation.md): evaluation policy and acceptance targets.
 - [`docs/kaggle-workflow.md`](docs/kaggle-workflow.md): free-GPU QLoRA workflow.
-- [`docs/report.md`](docs/report.md): longer technical report scaffold.
+- [`docs/report.md`](docs/report.md): final technical school report.
 
 ## School deliverables
 
