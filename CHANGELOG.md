@@ -4,6 +4,11 @@
 
 ### Changed
 
+- Finalise the English school report and 14-slide defence deck around the executed
+  8k comparison and recorded Modal deployment; distinguish technical acceptance from
+  safety, preserve historical evidence, and integrate user validation of all 144 AI-assisted
+  preannotations (140 accepted, 4 corrected); preserve speaker notes in rendered and text-only PowerPoint exports.
+
 - Configure the Modal FastAPI process with the same local vLLM URL and model alias as
   its child server, preventing unintended rule-only serving after GPU startup.
 

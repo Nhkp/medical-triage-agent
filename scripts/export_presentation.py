@@ -18,6 +18,7 @@ class Slide:
     subtitle: str = ""
     bullets: list[str] = field(default_factory=list)
     metrics: list[str] = field(default_factory=list)
+    notes: str = ""
 
 
 class DeckParser(html.parser.HTMLParser):
@@ -66,7 +67,9 @@ class DeckParser(html.parser.HTMLParser):
     def handle_data(self, data: str) -> None:
         """Capture text data unless it belongs to speaker notes."""
 
-        if self._capture and not self._skip_depth:
+        if self._skip_depth and self._current:
+            self._current.notes += data
+        elif self._capture:
             self._buffer.append(data)
 
     def _assign_text(self, tag: str, text: str) -> None:
@@ -143,6 +146,7 @@ def export_rendered_pptx(
             "Install presentation extras with `uv sync --extra presentation`."
         ) from exc
 
+    notes = [_clean(slide.notes) for slide in parse_deck(input_path)]
     input_uri = input_path.resolve().as_uri()
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -180,6 +184,7 @@ def export_rendered_pptx(
                         width=prs.slide_width,
                         height=prs.slide_height,
                     )
+                    pptx_slide.notes_slide.notes_text_frame.text = notes[index]
                 browser.close()
         except (PlaywrightError, PlaywrightTimeoutError) as exc:
             raise RuntimeError(
@@ -209,6 +214,7 @@ def export_text_pptx(slides: list[Slide], output_path: Path) -> None:
     blank = prs.slide_layouts[6]
     for index, slide_data in enumerate(slides, start=1):
         slide = prs.slides.add_slide(blank)
+        slide.notes_slide.notes_text_frame.text = _clean(slide_data.notes)
         _background(slide, prs, RGBColor(7, 19, 18))
         _accent_bar(slide, prs, RGBColor(64, 214, 176), index)
         _textbox(

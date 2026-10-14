@@ -1,113 +1,76 @@
-# CHSA medical triage POC presentation plan
+# CHSA school defence: 14 slides / approximately 15 minutes
 
-## 1. Medical Triage Agent
+Canonical source: `presentations/chsa-current-state/index.html`. Both report and slides are in English. Technical campaign results are measured; AI-assisted pedagogical preannotations were reviewed and validated by the user on 14 October 2026. No unrestricted clinical demonstration is recommended.
 
-- Purpose: open with the project identity and maturity.
-- Key message: bilingual, auditable, safety-oriented POC; not autonomous diagnosis.
-- Evidence: `README.md`, `docs/medical-safety.md`.
-- Visual: premium dark command-center hero with three proof points.
-- Narrative: frame the work as clinical support infrastructure, not a medical device claim.
+## 1. Mission and POC Outcome
 
-## 2. The CHSA Pressure Point
+45 s. State the mission and the result early. This is a school POC for clinical staff, not autonomous diagnosis. Main data is 8,000 SFT and 2,000 DPO pairs; the final serving campaign has 144 measurements per model. User validation of all 144 AI-assisted preannotations is complete: 140 accepted and 4 corrected on 14 October 2026.
 
-- Purpose: establish the emergency triage context from the mission brief.
-- Key message: triage overload creates a need for faster symptom structuring and escalation cues.
-- Evidence: `input/context.md`.
-- Visual: patient/context/decision-pressure flow into clinician review.
-- Narrative: the opportunity is synthesis and traceability under pressure.
+## 2. CHSA Need and Delivered Scope
 
-## 3. Assist, Never Replace
+45 s. Reference input/context.md. Do not describe a text-area API tester as an adaptive questionnaire. There are no private hospital data or deployed hospital integration. The clinically validated DPO-pair requirement remains an acknowledged gap.
 
-- Purpose: make the safety boundary unmissable.
-- Key message: the assistant supports clinicians; it must not diagnose, prescribe, or discharge.
-- Evidence: `docs/medical-safety.md`, `AGENTS.md`, `README.md`.
-- Visual: split contrast between supported behavior and forbidden behavior.
-- Narrative: safety rules come before model optimization.
+## 3. Architecture and Backend Authority
 
-## 4. System in One Picture
+60 s. Streamlit is a separate thin client. On Modal, FastAPI shares the container with vLLM. The backend keeps rule priority even when the model disagrees. It can still expose an unsafe accepted explanation when the priority matches. Audit state is in memory, not durable hospital infrastructure.
 
-- Purpose: show the full repository architecture.
-- Key message: each stage is separated for auditability.
-- Evidence: `docs/architecture.md`, `Makefile`, `docker-compose.yml`.
-- Visual: professional multi-stage pipeline from sources to vLLM/FastAPI.
-- Narrative: no magic box; data, training, evaluation, and serving are inspectable.
+## 4. Main Bilingual Dataset
 
-## 5. Step 0: Method Before Model
+45 s. Main manifest timestamp 20 August 2026 10:48:52 UTC. Counting a DPO pair once gives 10,000 total records. The 8k SFT set extends the approximately 5k request. Do not merge historical 5k training metrics into 8k comparison results.
 
-- Purpose: connect SFT/DPO concepts with the project safety design.
-- Key message: the repo turns Step 0 into guardrails, contracts, and human-in-the-loop rules.
-- Evidence: `input/step_0.md`, `docs/source-policy.md`, `docs/privacy-rgpd.md`.
-- Visual: four foundations: scope, privacy, provenance, evaluation.
-- Narrative: the model is only one component in a governed workflow.
+## 5. Provenance Privacy and Splits
 
-## 6. Step 1: Dataset Built and Audited
+60 s. Sources: MediQAl 3,951; FrenchMedMCQA 594; MedQuad 3,455; UltraMedical 2,000. Licence metadata is recorded; FrenchMedMCQA and MedQuad checks were owner-verifications. Zero PII findings only establishes what the automated scanner detected. Exact overlap checks are not semantic contamination guarantees.
 
-- Purpose: present completed data-preparation evidence.
-- Key message: the POC generated a bilingual SFT/DPO dataset with audit artifacts.
-- Evidence: `docs/report.md`, `docs/data-sources.md`.
-- Visual: metric wall with SFT, DPO, FR, EN counts.
-- Narrative: Step 1 is technically complete, with generated data kept out of git.
+## 6. SFT and DPO Training
 
-## 7. Data Governance
+60 s. Repository configuration: length 512, batch 1, accumulation 8, FP16, seed 42; SFT learning rate 2e-4 and DPO 5e-6, beta 0.1. These are configuration values, not a claim that every evaluated snapshot was reconstructed from local weights. Evaluated Hub snapshots are pinned separately. GRPO is not part of the comparison.
 
-- Purpose: explain source licensing and provenance.
-- Key message: every source is tracked by ID, license, language, intended use, and status.
-- Evidence: `docs/data-sources.md`, `docs/source-policy.md`.
-- Visual: compact registry table.
-- Narrative: verified public datasets enable a technical POC, not CHSA clinical labels.
+## 7. Reproducible Comparison Protocol
 
-## 8. Privacy and Audit Evidence
+70 s. Code d9244c4, clean checkout. vLLM 0.10.2, Transformers 4.56.2, torch 2.8.0, T4 listed, FP16 eager. Two listed GPUs do not prove parallel use. Three repeated passes are not independent clinical samples. The case expectations follow POC rules. Measurements include explicit input language; protocol supplies rule priority.
 
-- Purpose: show RGPD-minded controls and automated findings.
-- Key message: local audit passed with 0 PII findings, 0 duplicates, 0 missing provenance.
-- Evidence: `docs/report.md`, `docs/privacy-rgpd.md`, `src/medical_triage_agent/privacy.py`.
-- Visual: three green audit indicators plus rejection counts.
-- Narrative: automated privacy checks are necessary evidence, not clinical approval.
+## 8. Format and Repetition Results
 
-## 9. Clinical Validation Debt
+70 s. Historical initial serving ignored JSON constraints; intermediate serving truncated all SFT/DPO outputs. Last prompt, penalty and language changes were simultaneous, so no isolated penalty effect is claimed. Stored previews are bounded, and exact repetition is not semantic redundancy. All generation metadata was present.
 
-- Purpose: prevent overclaiming.
-- Key message: 5,000 public QA records remain queued for clinician review.
-- Evidence: `docs/report.md`, `docs/evaluation.md`.
-- Visual: risk ledger with what is proven vs what is pending.
-- Narrative: clinical sign-off is a go/no-go requirement.
+## 9. Latency and Model Differences
 
-## 10. Step 2: Low-VRAM Training Path
+60 s. Startup separately: Base 76.10 s, SFT 64.06 s, DPO 60.06 s. Model output length contributes to latency. The earlier equal-length comparison suggested additional adapter-path overhead, but no profile proves a cause. Kaggle T4 timings cannot be substituted for Modal L4 timings.
 
-- Purpose: explain SFT/DPO execution strategy.
-- Key message: Qwen3-1.7B-Base, 4-bit QLoRA SFT, then DPO, with conservative Colab/Kaggle defaults.
-- Evidence: `configs/sft.yaml`, `configs/dpo.yaml`, `scripts/train_sft.py`, `scripts/train_dpo.py`.
-- Visual: base model -> SFT adapter -> DPO adapter.
-- Narrative: start small, smoke-test, push adapters to Hugging Face when stable.
+## 10. Relevance and Pedagogical Review
 
-## 11. Evaluation: Technical Indicators Only
+70 s. User-validated nonconformity counts for invented/unsupported information: Base 21/48, SFT 21/46 with 2 unknown, DPO 23/48. User-validated dangerous advice: 3/48, 8/47 with 1 unknown, 8/48. These AI-assisted assessments were reviewed by the user: human_validated=true, 140 accepted and 4 corrected. DPO uncertainty nonconformity is now 42/48. A validated annotation can describe an unsafe response; clinical rates are not established.
 
-- Purpose: show how progress is measured.
-- Key message: model metrics, safety checks, latency, and traceability are tracked, but do not prove clinical safety.
-- Evidence: `docs/evaluation.md`, `scripts/evaluate.py`, `scripts/evaluate_latency.py`, `scripts/evaluate_robustness.py`.
-- Visual: evaluation matrix.
-- Narrative: the project separates technical readiness from clinical validation.
+## 11. Observed Failures and Protection Limits
 
-## 12. Step 3: Serving and Demo API
+90 s. Paraphrases only, not medical instructions. Also SFT/DPO French anaphylaxis contains prohibited treatment procedures. Final emergency rule priority is correct for 60/60 each, while accepted emergency suggestions are 35/60, 39/60 and 48/60. Raw priorities are 60/60, 55/60 and 60/60. Distinguish missing/rejected suggestions from final under-triage. User review confirms exclusion from unrestricted explanation use.
 
-- Purpose: show deployability.
-- Key message: FastAPI exposes stable endpoints and vLLM can serve the selected HF model/adapter on GPU.
-- Evidence: `src/medical_triage_agent/api.py`, `src/medical_triage_agent/vllm_client.py`, `Dockerfile`, `docker-compose.yml`.
-- Visual: client -> FastAPI -> vLLM -> model with audit side channel.
-- Narrative: fallback rules allow API validation without GPU; vLLM enables model-backed explanations.
+## 12. Modal Deployment and Demo Walkthrough
 
-## 13. Reproducibility and CI/CD
+60 s. State the FastAPI parent-environment correction. User screenshot before the fix was rule-only; it must not be used as model success proof. Modal does not yet enforce the same static adapter SHA/compatibility copies as Kaggle. UI is separate, observed on Render and also used on Community Cloud. Use synthetic FR/EN input, emergency and dangerous request, show audit/status. Keep recorded backup, not fabricated output.
 
-- Purpose: make the engineering quality visible.
-- Key message: `make check`, data commands, serving commands, GitHub Actions, and notebooks make the work repeatable.
-- Evidence: `Makefile`, `.github/workflows/check.yml`, `.github/workflows/deploy.yml`, `docs/colab-workflow.md`.
-- Visual: command tiles and CI pipeline.
-- Narrative: the project is designed to be rerun and inspected, not manually reconstructed.
+## 13. Evidence Limits and Demo Decision
 
-## 14. Roadmap and Decision Gate
+55 s. Separate school completion from clinical readiness. No-go for clinical pilot. A deterministic explanation mode is recommended for future demo safety but has not been implemented here. Existing demonstration should be a supervised engineering case study. Completed human educational validation does not replace clinician sign-off.
 
-- Purpose: close with concrete next decisions.
-- Key message: finish model-backed metrics, clinician review, and pilot hosting before any production claim.
-- Evidence: `docs/report.md`, `input/step_3.md`, `docs/medical-safety.md`.
-- Visual: go/no-go checklist.
-- Narrative: the next milestone is not “more AI”; it is evidence, safety, and deployment discipline.
+## 14. Roadmap and Clinical Pilot Gates
+
+50 s. Total planned narrative approximately 900 seconds, allowing transitions. Report stays under 20 pages and historical evidence is separate. Before pilot: qualified review, safe refusals, uncertainty, versioned deployment, monitoring, privacy and operational governance. End on the result: a working technical POC with documented safety limits.
+
+## Export and rehearsal
+
+Run `make presentation-pptx` for the existing rendered export. Speaker notes from the canonical HTML are automatically embedded in the generated PPTX. Export a slide PDF with LibreOffice. Compare slides with the report and campaign summary, verify 14 pages/slides and rehearse at 15 minutes. Keep a recorded backup and show explanation source/LLM status when demonstrating the API. Generated deliverables stay outside Git.
+
+### Reproduce the deliverables
+
+```bash
+pandoc docs/report.md --standalone --columns=10 --reference-doc=dist/reports/chsa-report-reference.docx --output dist/reports/chsa-school-report.docx
+libreoffice -env:UserInstallation=file:///tmp/chsa-lo-report-profile --headless --convert-to pdf --outdir dist/reports dist/reports/chsa-school-report.docx
+make presentation-pptx
+libreoffice -env:UserInstallation=file:///tmp/chsa-lo-slides-profile --headless --convert-to pdf --outdir dist/presentations dist/presentations/chsa-current-state.pptx
+pdfinfo dist/reports/chsa-school-report.pdf
+pdfinfo dist/presentations/chsa-current-state.pdf
+```
+
+Create the two `dist/` directories first and restore the supplied `chsa-report-reference.docx` from the delivery archive; its Compact style keeps table rows together. The `--columns=10` option prevents zero-width table grids with the installed Pandoc 2.9 DOCX writer; it does not set a ten-character paragraph width in Word. Isolated LibreOffice profiles avoid interfering with an existing desktop session. Report and deck exports incorporate the completed user review. The generated report must stay under 20 pages; the deck must stay at 14 slides/pages.

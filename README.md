@@ -3,8 +3,8 @@
 ## Abstract
 
 This repository implements a CHSA proof of concept for a bilingual medical triage assistant.
-The current system is a reproducible scaffold for public-data preparation, privacy checks,
-local safety evaluation, SFT/DPO training scripts, and a thin FastAPI serving layer. It is not
+The system implements reproducible public-data preparation, privacy checks, SFT/DPO
+training, executed Base/SFT/DPO comparisons, and a deployed FastAPI/vLLM demonstration. It is not
 a production medical device and does not replace clinician judgment.
 
 ## Introduction
@@ -30,11 +30,11 @@ normalizes records into stable SFT and DPO JSONL schemas, applies lightweight PI
 creates deterministic train/validation/test/clinical-evaluation splits, and writes generated
 artifacts outside git.
 
-The model plan follows a staged alignment workflow: Qwen3-1.7B-Base is adapted with 4-bit
+The implemented training workflow follows staged alignment: Qwen3-1.7B-Base is adapted with 4-bit
 QLoRA SFT, then aligned with DPO preference data. Kaggle free GPUs are the low-VRAM execution
 path for the first experiments, while Hugging Face remains the publication target for private
-datasets and LoRA adapters. Full training artifacts are not claimed until run logs and model
-repositories exist.
+datasets and LoRA adapters. Local full-epoch checkpoint logs and immutable evaluated snapshots provide training and
+serving evidence; their lineage and limitations are documented separately in the report.
 
 Serving is designed around a vLLM OpenAI-compatible backend behind a thin FastAPI wrapper. The
 wrapper owns domain validation, safety disclaimers, conservative priority arbitration,
@@ -95,8 +95,9 @@ make train-8k
 # Historical experiment: data-pull-5k, data-audit-5k, train-5k.
 ```
 
-Hub IDs are configured for both experiments; current 8k publication availability and
-visibility have not been verified from the available local evidence.
+The main Kaggle manifest records downloaded immutable 8k dataset/model snapshots. This
+establishes availability at campaign execution, not current Hub visibility or a byte-for-byte
+match between local training checkpoints and evaluated published adapters.
 
 Remove generated training-data artifacts:
 
@@ -165,12 +166,19 @@ Base/SFT-8k/DPO-8k sequentially on 48 synthetic bilingual cases, with pinned sna
 three measured passes and separate model/backend indicators. Run
 `make eval-model-comparison-dry-run` locally; use Kaggle for GPU execution. See
 [the evaluation protocol](docs/evaluation.md) for credentials, campaign exports and the
-pedagogical review grid. The initial campaign `20261008T061839Z-8k` produced 144
-requests per model but exposed ignored JSON constraints and tokenizer fallback; it does
-not support a model recommendation. The corrected notebook retains the same revisions,
-uses `guided_json`, 256 tokens and six technical probes per model before measurement.
-Corrected GPU measurements and reviewed conclusions remain pending. Initial exports stay
-unchanged; the repaired review is written separately under `outputs/reviews/`.
+pedagogical review grid. The main campaign `20261008T202221Z-8k` completed 144 measured requests per model.
+Raw schema conformity was 100% / 94.4% / 100% for Base / SFT / DPO; automatic acceptance
+was 72.2% / 75.7% / 87.5%, with HTTP median latency 2.39 / 5.66 / 6.24 seconds.
+No exact repetition was detected; eight SFT outputs reached the 256-token ceiling.
+The backend protected all tested emergency priorities, but accepted explanations still
+contain unsupported facts and prohibited advice. Automatic acceptance is not clinical safety.
+
+The initial and intermediate campaigns remain separate historical evidence. All 144
+first-pass responses have AI-assisted preannotations under `outputs/reviews/20261008T202221Z-8k/`;
+**user validation is complete** (14 October 2026: 140 accepted, 4 corrected).
+The validated pedagogical review excludes all three models from unrestricted explanation
+use; it is not professional clinical validation. See the [school report](docs/report.md) and
+[defence plan](docs/presentation_plan.md). No safe unrestricted explanation model is recommended.
 
 ## Demonstration deployment
 
@@ -178,7 +186,12 @@ The `deploy-demo` GitHub Actions workflow runs checks, builds Docker, validates 
 deploys to Modal on manual launch, and polls `/health` for up to fifteen minutes.
 Configure the four GitHub secrets and the `MODAL_URL` variable described in
 [`docs/modal-deployment.md`](docs/modal-deployment.md). `make deploy` remains available locally.
-A successful live workflow and endpoint check are still required as deployment evidence.
+[Actions run 38448371074](https://github.com/Nhkp/medical-triage-agent/actions/runs/38448371074)
+deployed commit `285d4c1` on 13 October 2026. A direct Modal health check reported
+`medical-triage-dpo-8k` / `configured`; the Streamlit interface was independently rendered
+on Render. Post-fix remote inference quality, remote latency/robustness and equality of
+live serving assets with the pinned Kaggle snapshots are not yet established by this evidence.
+A configuration health check is not proof of an accepted model answer.
 
 ## Limitations
 
@@ -215,3 +228,12 @@ uncertainty, escalation rules, and safety disclaimers.
 - [`docs/kaggle-workflow.md`](docs/kaggle-workflow.md): free-GPU QLoRA workflow.
 - [`docs/colab-workflow.md`](docs/colab-workflow.md): Colab T4 QLoRA workflow.
 - [`docs/report.md`](docs/report.md): longer technical report scaffold.
+
+## School deliverables
+
+The English report source is `docs/report.md`; the 14-slide HTML/CSS deck is under
+`presentations/chsa-current-state/`. The report DOCX/PDF, rendered PPTX/slide PDF and
+speaker notes are generated under ignored `dist/` folders. The PDF report stays within
+20 pages including references. `make presentation-pptx` exports the canonical deck.
+AI-assisted preannotations and the completed human-validation ledger stay outside Git.
+User approval does not establish professional clinical validation.

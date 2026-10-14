@@ -1,268 +1,47 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Medical Triage Agent — CHSA POC</title>
-    <link rel="stylesheet" href="styles.css" />
-  </head>
-  <body>
-    <main class="deck" data-deck-title="Medical Triage Agent — CHSA POC">
-      <section class="slide title" data-slide-title="Medical Triage Agent">
-        <p class="eyebrow">Centre Hospitalier Saint-Aurélien · Proof of concept</p>
-        <h1>Medical Triage Agent</h1>
-        <p class="subtitle">
-          A bilingual, auditable and safety-oriented medical triage AI POC for clinical staff
-          support.
-        </p>
-        <div class="hero-grid" aria-hidden="true">
-          <span>Symptoms</span>
-          <span>Context</span>
-          <span>Red flags</span>
-          <span>Clinician review</span>
-        </div>
-        <div class="metrics">
-          <span>8,000 SFT records</span>
-          <span>2,000 DPO pairs</span>
-          <span>Human-in-the-loop</span>
-        </div>
-        <aside class="notes">
-          Open with the boundary: this is a clinician-support POC, not autonomous diagnosis.
-        </aside>
-      </section>
-
-      <section class="slide split" data-slide-title="The CHSA Pressure Point">
-        <div>
-          <p class="eyebrow">Clinical pressure</p>
-          <h2>Initial triage needs fast structure under uncertainty</h2>
-          <p class="lede">
-            CHSA’s emergency department context is overloaded: staff must gather symptoms,
-            detect escalation signals, and keep decisions traceable under time pressure.
-          </p>
-        </div>
-        <div class="signal-stack">
-          <div><strong>Patient</strong><span>declared symptoms and context</span></div>
-          <div><strong>Pressure</strong><span>limited time, incomplete information</span></div>
-          <div><strong>Clinician</strong><span>priority decision remains human</span></div>
-        </div>
-        <aside class="notes">Use input/context.md as the mission origin.</aside>
-      </section>
-
-      <section class="slide compare" data-slide-title="Assist, Never Replace">
-        <p class="eyebrow">Scope and safety boundary</p>
-        <h2>Assist, never replace</h2>
-        <div class="two-column">
-          <article class="good">
-            <h3>Should support</h3>
-            <ul>
-              <li>Collect patient-declared symptoms.</li>
-              <li>Structure relevant context.</li>
-              <li>Escalate red-flag signals.</li>
-              <li>Explain priority with an audit ID.</li>
-            </ul>
-          </article>
-          <article class="risk">
-            <h3>Must not do</h3>
-            <ul>
-              <li>Make autonomous diagnoses.</li>
-              <li>Prescribe or discharge.</li>
-              <li>Hide uncertainty.</li>
-              <li>Replace clinician judgment.</li>
-            </ul>
-          </article>
-        </div>
-        <aside class="notes">This slide should be crisp. It is central to stakeholder trust.</aside>
-      </section>
-
-      <section class="slide architecture" data-slide-title="System in One Picture">
-        <p class="eyebrow">Architecture</p>
-        <h2>Auditable stages from public sources to API demo</h2>
-        <div class="pipeline">
-          <span>Verified public sources</span>
-          <span>Registry + license</span>
-          <span>SFT/DPO schemas</span>
-          <span>RGPD checks</span>
-          <span>Splits + manifest</span>
-          <span>Qwen3 base</span>
-          <span>SFT + LoRA</span>
-          <span>DPO alignment</span>
-          <span>vLLM</span>
-          <span>FastAPI + audit</span>
-        </div>
-        <p class="caption">
-          Each stage has a contract, a reproducibility command, and an explicit safety limit.
-        </p>
-        <aside class="notes">Redrawn from docs/architecture.md; no hidden black box.</aside>
-      </section>
-
-      <section class="slide" data-slide-title="Step 0: Method Before Model">
-        <p class="eyebrow">Step 0 · Design foundations</p>
-        <h2>Safety and governance were designed before training</h2>
-        <div class="cards">
-          <article>
-            <h3>SFT</h3>
-            <p>Teach the base model the expected supervised response format.</p>
-          </article>
-          <article>
-            <h3>DPO</h3>
-            <p>Align responses from preference pairs without a separate reward model.</p>
-          </article>
-          <article>
-            <h3>Guardrails</h3>
-            <p>Human review, privacy, provenance and non-diagnostic boundaries.</p>
-          </article>
-        </div>
-        <aside class="notes">Tie input/step_0.md definitions to repo guardrails.</aside>
-      </section>
-
-      <section class="slide emphasis" data-slide-title="Step 1: Dataset Built and Audited">
-        <p class="eyebrow">Step 1 · Data milestone</p>
-        <h2>The bilingual training dataset is technically complete</h2>
-        <div class="big-grid">
-          <div><strong>8,000</strong><span>SFT instruction-response records</span></div>
-          <div><strong>2,000</strong><span>DPO preference pairs</span></div>
-          <div><strong>4,545</strong><span>French records</span></div>
-          <div><strong>5,455</strong><span>English records</span></div>
-        </div>
-        <p class="caption">8k extends the requested ~5k corpus; 5k remains historical. Hub publication not reverified.</p>
-        <aside class="notes">Use docs/report.md counts; do not claim clinician validation.</aside>
-      </section>
-
-      <section class="slide" data-slide-title="Data Governance">
-        <p class="eyebrow">Source governance</p>
-        <h2>Every source is license-checked and provenance-tracked</h2>
-        <table>
-          <tr><th>Source</th><th>Language</th><th>Use</th><th>Status</th></tr>
-          <tr><td>MediQAl</td><td>FR</td><td>SFT / eval</td><td>verified · CC-BY-4.0</td></tr>
-          <tr><td>FrenchMedMCQA</td><td>FR</td><td>SFT / eval</td><td>verified · Apache-2.0</td></tr>
-          <tr><td>MedQuad</td><td>EN</td><td>SFT</td><td>verified · Apache-2.0</td></tr>
-          <tr><td>UltraMedical-Preference</td><td>EN</td><td>DPO</td><td>verified · MIT</td></tr>
-        </table>
-        <aside class="notes">8k source counts: MediQAl 3,951; FrenchMedMCQA 594; MedQuad 3,455; UltraMedical 2,000.
-          Splits and SHA-256 hashes are recorded in docs/report.md.</aside>
-      </section>
-
-      <section class="slide" data-slide-title="Privacy and Audit Evidence">
-        <p class="eyebrow">Privacy and RGPD-minded controls</p>
-        <h2>Automated audit passed on the local 8k dataset</h2>
-        <div class="big-grid three">
-          <div><strong>0</strong><span>PII findings</span></div>
-          <div><strong>0</strong><span>duplicates</span></div>
-          <div><strong>0</strong><span>missing provenance</span></div>
-        </div>
-        <p class="caption">
-          Rejected rows are documented: MediQAl 1,018, FrenchMedMCQA 1, MedQuad 54,
-          UltraMedical-Preference 8.
-        </p>
-        <aside class="notes">Automated privacy evidence is necessary but not sufficient.</aside>
-      </section>
-
-      <section class="slide warning" data-slide-title="Clinical Review Debt">
-        <p class="eyebrow">Limit made visible</p>
-        <h2>Public QA data is not CHSA triage ground truth</h2>
-        <div class="risk-ledger">
-          <div>
-            <strong>Proven locally</strong>
-            <span>schemas, splits, provenance, PII scan, API fallback checks</span>
-          </div>
-          <div>
-            <strong>Still pending</strong>
-            <span>clinician validation, final model-backed metrics, production go/no-go</span>
-          </div>
-        </div>
-        <p class="lede">
-          Technical validation performed; professional clinical validation not performed. The 8,000-record
-          review queue prepares future review. Clinically validated DPO pairs remain an explicit
-          gap in this school submission.
-        </p>
-        <p class="caption">School review: provenance · FR/EN consistency · red flags · uncertainty · human decision.</p>
-        <aside class="notes">Pedagogical grid: provenance, FR/EN consistency, red flags, uncertainty, human decision.
-          Professional review is a clinical-pilot gate, not an extra school implementation task.</aside>
-      </section>
-
-      <section class="slide" data-slide-title="Step 2: Low-VRAM Training Path">
-        <p class="eyebrow">Step 2 · SFT and alignment</p>
-        <h2>Qwen3-1.7B is adapted through a low-VRAM QLoRA path</h2>
-        <div class="model-flow">
-          <span>Qwen3-1.7B-Base</span>
-          <span>4-bit QLoRA SFT</span>
-          <span>Instruction adapter</span>
-          <span>DPO preference alignment</span>
-          <span>Aligned triage adapter</span>
-        </div>
-        <div class="cards">
-          <article><h3>Conservative defaults</h3><p>FP16, max length 512, batch size 1.</p></article>
-          <article><h3>Execution path</h3><p>Colab/Kaggle GPU first, Hub publication for artifacts.</p></article>
-          <article><h3>GRPO</h3><p>Optional POC only, not an acceptance requirement.</p></article>
-        </div>
-        <aside class="notes">Reference configs and recent DPO tokenizer fix if asked.</aside>
-      </section>
-
-      <section class="slide" data-slide-title="Evaluation: Technical Indicators Only">
-        <p class="eyebrow">Evaluation strategy</p>
-        <h2>Metrics support decisions; they do not prove clinical safety</h2>
-        <div class="matrix">
-          <span>Clinical safety prompts</span>
-          <span>Dangerous-advice refusal</span>
-          <span>Bilingual quality samples</span>
-          <span>Hallucination checks</span>
-          <span>Latency p50 / p95</span>
-          <span>Traceability completeness</span>
-        </div>
-        <p class="caption">48 paired bilingual cases; 3 passes/model; separate model and backend metrics.
-          Initial campaign: 144 requests/model; accepted Base 2/144, SFT/DPO 0/144; backend emergency recall 90%.
-          Serving corrected: guided JSON, 256 tokens, verified tokenizers and 6 technical probes/model.
-          Corrected GPU results and 144 reviews pending; no model preference or clinical validation.</p>
-        <aside class="notes">Ground in docs/evaluation.md and scripts/evaluate*.py.</aside>
-      </section>
-
-      <section class="slide" data-slide-title="Step 3: Serving and Demo API">
-        <p class="eyebrow">Step 3 · Deployment path</p>
-        <h2>FastAPI wraps vLLM with stable triage and audit endpoints</h2>
-        <div class="api-map">
-          <div><strong>GET /health</strong><span>service and model readiness</span></div>
-          <div><strong>POST /triage</strong><span>symptoms → priority, explanation, audit ID</span></div>
-          <div><strong>GET /audit/{id}</strong><span>metadata-only trace, no raw patient text</span></div>
-        </div>
-        <p class="caption">
-          Fallback rules validate the API without GPU; vLLM enables model-backed explanations on
-          a GPU host or Colab runtime.
-        </p>
-        <aside class="notes">Mention docker-compose, Dockerfile and colab_serving.ipynb.</aside>
-      </section>
-
-      <section class="slide" data-slide-title="Reproducibility and CI/CD">
-        <p class="eyebrow">Engineering evidence</p>
-        <h2>The POC is operated through reproducible commands</h2>
-        <div class="command-grid">
-          <code>make check</code>
-          <code>make data-ready</code>
-          <code>make step3-ready</code>
-          <code>make serve-api</code>
-          <code>make serve-local</code>
-          <code>make presentation-pptx</code>
-        </div>
-        <p class="caption">
-          Manual GitHub Actions: checks → Docker/Compose → Modal → /health (15-minute limit).
-          A successful live run remains to be recorded.
-        </p>
-        <aside class="notes">This is about repeatability and auditability, not just code volume.</aside>
-      </section>
-
-      <section class="slide closing" data-slide-title="Roadmap and Decision Gate">
-        <p class="eyebrow">Next decisions</p>
-        <h2>The next milestone is evidence, not bigger promises</h2>
-        <ol>
-          <li>Finish SFT/DPO adapter publication and model-backed evaluation.</li>
-          <li>Run vLLM + FastAPI validation on a GPU serving runtime.</li>
-          <li>Document school review criteria; obtain professional review before a clinical pilot.</li>
-          <li>Decide pilot exposure only after safety, audit and latency gates pass.</li>
-        </ol>
-        <p class="subtitle">
-          Current status: data milestone complete; training and serving paths are reproducible;
-          professional clinical validation remains outside the completed technical validation.
-        </p>
-      </section>
-    </main>
-  </body>
-</html>
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><title>CHSA Medical Triage — School Defence</title><link rel="stylesheet" href="styles.css"/></head>
+<body><main class="deck" data-deck-title="CHSA Medical Triage — School Defence">
+<section class="slide" data-slide-title="Mission and POC Outcome"><p class="eyebrow">CHSA · School defence · 14 October 2026</p><h2>A deployed POC, with an explicit safety limit</h2>
+<div class="big-grid three"><div><strong>8k / 2k</strong><span>SFT records / DPO pairs</span></div><div><strong>432</strong><span>measured requests</span></div><div><strong>3</strong><span>models compared</span></div></div>
+<p class="caption">Technical feasibility demonstrated. Clinical benefit and safe free-text explanations not established.</p><aside class="notes">45 s. State the mission and the result early. This is a school POC for clinical staff, not autonomous diagnosis. Main data is 8,000 SFT and 2,000 DPO pairs; the final serving campaign has 144 measurements per model. User validation of all 144 AI-assisted preannotations is complete: 140 accepted and 4 corrected on 14 October 2026.</aside></section>
+<section class="slide" data-slide-title="CHSA Need and Delivered Scope"><p class="eyebrow">01 · Mission boundary</p><h2>Support triage; keep the decision human</h2>
+<div class="two-column"><article class="good"><h3>Delivered</h3><ul><li>Bilingual symptoms → API priority.</li><li>SFT/DPO training and comparison.</li><li>Audit metadata and cloud demonstration.</li></ul></article><article class="risk"><h3>Not demonstrated</h3><ul><li>Adaptive clinical questionnaire.</li><li>Hospital information-system integration.</li><li>Professional clinical validation.</li></ul></article></div>
+<p class="caption">The input describes a four-week POC. These scope gaps remain visible in the final report.</p><aside class="notes">45 s. Reference input/context.md. Do not describe a text-area API tester as an adaptive questionnaire. There are no private hospital data or deployed hospital integration. The clinically validated DPO-pair requirement remains an acknowledged gap.</aside></section>
+<section class="slide" data-slide-title="Architecture and Backend Authority"><p class="eyebrow">02 · Architecture</p><h2>The backend owns the final priority</h2>
+<div class="pipeline"><span>Public sources</span><span>Data + audit</span><span>SFT → DPO</span><span>vLLM</span><span>FastAPI</span></div><div class="cards"><article><h3>Before generation</h3><p>Rules assess declared symptoms.</p></article><article><h3>After generation</h3><p>Accepted matching text or explicit fallback.</p></article><article><h3>Traceability</h3><p>Audit ID, metadata and expurgated preview.</p></article></div>
+<p class="caption">Rule priority also appears in the prompt. Final rule agreement is not independent model reasoning.</p><aside class="notes">60 s. Streamlit is a separate thin client. On Modal, FastAPI shares the container with vLLM. The backend keeps rule priority even when the model disagrees. It can still expose an unsafe accepted explanation when the priority matches. Audit state is in memory, not durable hospital infrastructure.</aside></section>
+<section class="slide" data-slide-title="Main Bilingual Dataset"><p class="eyebrow">03 · Data</p><h2>8,000 SFT records + 2,000 DPO pairs</h2>
+<div class="big-grid"><div><strong>8,000</strong><span>SFT examples</span></div><div><strong>2,000</strong><span>DPO pairs</span></div><div><strong>4,545</strong><span>French records</span></div><div><strong>5,455</strong><span>English records</span></div></div>
+<p class="caption">Language counts include SFT and DPO together. The original 5k/1k experiment stays historical.</p><aside class="notes">45 s. Main manifest timestamp 20 August 2026 10:48:52 UTC. Counting a DPO pair once gives 10,000 total records. The 8k SFT set extends the approximately 5k request. Do not merge historical 5k training metrics into 8k comparison results.</aside></section>
+<section class="slide" data-slide-title="Provenance Privacy and Splits"><p class="eyebrow">04 · Governance</p><h2>Audited data does not mean clinical ground truth</h2>
+<table><tr><th>Type</th><th>Train</th><th>Validation</th><th>Test</th><th>Clinical-eval split</th></tr><tr><td>SFT</td><td>6,361</td><td>809</td><td>589</td><td>241</td></tr><tr><td>DPO</td><td>1,588</td><td>215</td><td>137</td><td>60</td></tr></table><div class="metrics"><span>0 detected PII</span><span>0 duplicates</span><span>0 missing provenance</span></div>
+<p class="caption">Public QA/preferences, source licences and deterministic splits. “clinical_eval” is a split name, not clinician sign-off.</p><aside class="notes">60 s. Sources: MediQAl 3,951; FrenchMedMCQA 594; MedQuad 3,455; UltraMedical 2,000. Licence metadata is recorded; FrenchMedMCQA and MedQuad checks were owner-verifications. Zero PII findings only establishes what the automated scanner detected. Exact overlap checks are not semantic contamination guarantees.</aside></section>
+<section class="slide" data-slide-title="SFT and DPO Training"><p class="eyebrow">05 · Adaptation</p><h2>Two objectives; no clinical safety inference</h2>
+<div class="model-flow"><span>Qwen3-1.7B-Base</span><span>4-bit LoRA SFT</span><span>SFT adapter</span><span>DPO preferences</span><span>DPO adapter</span></div><table><tr><th>8k checkpoint indicator</th><th>SFT · step 398</th><th>DPO · step 99</th></tr><tr><td>Validation loss</td><td>2.615474</td><td>0.558291</td></tr><tr><td>Token accuracy</td><td>0.711297</td><td>0.707596</td></tr><tr><td>Preference accuracy / margin</td><td>Not applicable</td><td>0.724299 / 0.531351</td></tr></table>
+<p class="caption">Local full-epoch logs; smoke checkpoints excluded. Losses have different objectives and are not directly comparable.</p><aside class="notes">60 s. Repository configuration: length 512, batch 1, accumulation 8, FP16, seed 42; SFT learning rate 2e-4 and DPO 5e-6, beta 0.1. These are configuration values, not a claim that every evaluated snapshot was reconstructed from local weights. Evaluated Hub snapshots are pinned separately. GRPO is not part of the comparison.</aside></section>
+<section class="slide" data-slide-title="Reproducible Comparison Protocol"><p class="eyebrow">06 · Measurement</p><h2>48 cases × 3 passes × 3 models</h2>
+<div class="cards"><article><h3>24 bilingual pairs</h3><p>10 emergencies · 7 common symptoms · 3 ambiguous · 4 dangerous requests.</p></article><article><h3>Same configuration</h3><p>Seed 42 · temperature 0 · guided JSON · 256 tokens · penalty 1.1.</p></article><article><h3>Qualified serving</h3><p>Pinned snapshots · verified tokenizer copies · 6 probes · 2 warmups.</p></article></div>
+<p class="caption">Main campaign: 20261008T202221Z-8k. Errors, rejected outputs and fallbacks stay in denominators.</p><aside class="notes">70 s. Code d9244c4, clean checkout. vLLM 0.10.2, Transformers 4.56.2, torch 2.8.0, T4 listed, FP16 eager. Two listed GPUs do not prove parallel use. Three repeated passes are not independent clinical samples. The case expectations follow POC rules. Measurements include explicit input language; protocol supplies rule priority.</aside></section>
+<section class="slide" data-slide-title="Format and Repetition Results"><p class="eyebrow">07 · Generation evidence</p><h2>Complete JSON improved; safety remains separate</h2>
+<table><tr><th>144 requests / model</th><th>Base</th><th>SFT</th><th>DPO</th></tr><tr><td>Raw schema-valid JSON</td><td>144/144</td><td>136/144</td><td>144/144</td></tr><tr><td>Automatically accepted</td><td>104/144 · 72.2%</td><td>109/144 · 75.7%</td><td>126/144 · 87.5%</td></tr><tr><td>Length-limited outputs</td><td>0</td><td>8</td><td>0</td></tr><tr><td>Exact repetitions / accepted repairs</td><td>0 / 0</td><td>0 / 0</td><td>0 / 0</td></tr></table>
+<p class="caption">No repairs were needed: this run does not demonstrate real-GPU repair efficacy. Automatic acceptance is not clinical approval.</p><aside class="notes">70 s. Historical initial serving ignored JSON constraints; intermediate serving truncated all SFT/DPO outputs. Last prompt, penalty and language changes were simultaneous, so no isolated penalty effect is claimed. Stored previews are bounded, and exact repetition is not semantic redundancy. All generation metadata was present.</aside></section>
+<section class="slide" data-slide-title="Latency and Model Differences"><p class="eyebrow">08 · Performance</p><h2>Base is fastest; SFT has the longest tail</h2>
+<table><tr><th>After warmup · HTTP seconds</th><th>Base</th><th>SFT</th><th>DPO</th></tr><tr><td>p50</td><td>2.39</td><td>5.66</td><td>6.24</td></tr><tr><td>p95</td><td>5.37</td><td>18.77</td><td>14.36</td></tr><tr><td>Accepted-only p50 / p95</td><td>2.81 / 5.02</td><td>5.60 / 10.47</td><td>6.24 / 13.68</td></tr></table><div class="metrics"><span>Base: −58.4% p50</span><span>SFT: −70.9% p50</span><span>DPO: −67.0% p50</span></div>
+<p class="caption">Change versus the intermediate 09:15 UTC campaign; outputs and serving contract changed. Not a pure decode benchmark.</p><aside class="notes">60 s. Startup separately: Base 76.10 s, SFT 64.06 s, DPO 60.06 s. Model output length contributes to latency. The earlier equal-length comparison suggested additional adapter-path overhead, but no profile proves a cause. Kaggle T4 timings cannot be substituted for Modal L4 timings.</aside></section>
+<section class="slide" data-slide-title="Relevance and Pedagogical Review"><p class="eyebrow">09 · User-validated review</p><h2>144 annotations reviewed by the user</h2>
+<div class="matrix"><span>Unsupported facts</span><span>Dangerous advice</span><span>Appropriate refusal</span><span>Uncertainty + human review</span><span>Input language</span><span>Bilingual consistency</span></div>
+<p class="caption">140 accepted; 4 corrected. Pedagogical review, not clinician sign-off. Missing/truncated text cannot establish absence of hallucinations. Clinical validation was not performed.</p><aside class="notes">70 s. User-validated nonconformity counts for invented/unsupported information: Base 21/48, SFT 21/46 with 2 unknown, DPO 23/48. User-validated dangerous advice: 3/48, 8/47 with 1 unknown, 8/48. These AI-assisted assessments were reviewed by the user: human_validated=true, 140 accepted and 4 corrected. DPO uncertainty nonconformity is now 42/48. A validated annotation can describe an unsafe response; clinical rates are not established.</aside></section>
+<section class="slide" data-slide-title="Observed Failures and Protection Limits"><p class="eyebrow">10 · Failure analysis</p><h2>Correct priority can coexist with unsafe text</h2>
+<table><tr><th>Case / model</th><th>Observed failure</th></tr><tr><td>Safety bypass / Base</td><td>Encourages ignoring the safety rules.</td></tr><tr><td>Diagnosis request / SFT + DPO</td><td>Invents a clinical case and proposes surgery.</td></tr><tr><td>Stroke signs / DPO</td><td>Off-topic medicine explanation.</td></tr><tr><td>Fatigue / DPO</td><td>Invents chronic kidney disease.</td></tr></table>
+<p class="caption">These outputs were accepted and displayed. The lexical filter does not establish relevance, provenance or refusal.</p><aside class="notes">90 s. Paraphrases only, not medical instructions. Also SFT/DPO French anaphylaxis contains prohibited treatment procedures. Final emergency rule priority is correct for 60/60 each, while accepted emergency suggestions are 35/60, 39/60 and 48/60. Raw priorities are 60/60, 55/60 and 60/60. Distinguish missing/rejected suggestions from final under-triage. User review confirms exclusion from unrestricted explanation use.</aside></section>
+<section class="slide" data-slide-title="Modal Deployment and Demo Walkthrough"><p class="eyebrow">11 · Deployment evidence</p><h2>Deployed API, with explicit evidence boundaries</h2>
+<div class="api-map"><div><strong>GET /health</strong><span>Model alias + vLLM configuration.</span></div><div><strong>POST /triage</strong><span>Inspect priority and explanation source.</span></div><div><strong>GET /audit/{id}</strong><span>Retrieve expurgated generation metadata.</span></div></div><div class="model-flow"><span>Actions checks</span><span>Docker / Compose</span><span>Modal L4</span><span>FastAPI + vLLM</span><span>Streamlit client</span></div>
+<p class="caption">13 Oct: Actions run 38448371074 succeeded; commit 285d4c1. Health reported DPO-8k / configured. Remote inference quality not yet evidenced.</p><aside class="notes">60 s. State the FastAPI parent-environment correction. User screenshot before the fix was rule-only; it must not be used as model success proof. Modal does not yet enforce the same static adapter SHA/compatibility copies as Kaggle. UI is separate, observed on Render and also used on Community Cloud. Use synthetic FR/EN input, emergency and dangerous request, show audit/status. Keep recorded backup, not fabricated output.</aside></section>
+<section class="slide" data-slide-title="Evidence Limits and Demo Decision"><p class="eyebrow">12 · Decision</p><h2>No safe free-text model winner established</h2>
+<div class="two-column"><article class="good"><h3>Supported by measurements</h3><ul><li>DPO: highest automatic acceptance.</li><li>Base: lowest median latency.</li><li>Backend: all tested emergencies protected.</li></ul></article><article class="risk"><h3>Decision boundary</h3><ul><li>User-validated contract failures remain.</li><li>Unsafe accepted explanations observed.</li><li>No unrestricted clinical demonstration.</li></ul></article></div>
+<p class="caption">Technical validation performed; professional clinical validation not performed.</p><aside class="notes">55 s. Separate school completion from clinical readiness. No-go for clinical pilot. A deterministic explanation mode is recommended for future demo safety but has not been implemented here. Existing demonstration should be a supervised engineering case study. Completed human educational validation does not replace clinician sign-off.</aside></section>
+<section class="slide" data-slide-title="Roadmap and Clinical Pilot Gates"><p class="eyebrow">13 · Next steps</p><h2>Close evidence gaps before scaling up</h2>
+<ol><li>Archive the validated review and rehearse the school defence.</li><li>Qualify identical serving assets and authenticated remote inference.</li><li>Improve refusal/provenance; evaluate changed behaviour again.</li><li>Obtain clinical validation and hospital governance before a pilot.</li></ol>
+<p class="caption">Adaptive questionnaire, hospital integration and durable audits remain future work. Larger models are conditional, not the next default.</p><aside class="notes">50 s. Total planned narrative approximately 900 seconds, allowing transitions. Report stays under 20 pages and historical evidence is separate. Before pilot: qualified review, safe refusals, uncertainty, versioned deployment, monitoring, privacy and operational governance. End on the result: a working technical POC with documented safety limits.</aside></section>
+</main></body></html>

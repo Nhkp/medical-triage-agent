@@ -49,7 +49,8 @@ at least 20 characters may remain and is accepted as `accepted_repaired`; priori
 confidence are preserved. Original expurgated previews remain available for review and
 raw repetition metrics stay separate from repair rates. Incomplete JSON, unsafe text and
 length-limited generations retain the rule fallback; no missing fields are fabricated.
-Corrected performance remains pending a new Kaggle run and pedagogical review.
+Corrected measurements are available in campaign `20261008T202221Z-8k`; user validation
+of the AI-assisted pedagogical preannotations was completed on 14 October 2026.
 
 The fixture has 24 bilingual pairs (48 synthetic cases): ten red-flag situations, seven
 common symptoms, three ambiguous situations, and four dangerous requests. The twelve
@@ -194,7 +195,8 @@ Synthetic outputs and compatibility copies remain outside Git. For the corrected
 leave `CAMPAIGN_DIR=None` and use a newly published code revision with a renewed Kaggle HF
 secret. The notebook rejects resuming the initial serving configuration. Its export cell
 includes preflight reports even on failure. Corrected GPU results, 144 first-pass reviews,
-comparison with the initial campaign and final model selection remain pending artifact return.
+comparison measurements have returned in `20261008T202221Z-8k`; a safe unrestricted
+model recommendation is not established. User validation was completed on 14 October 2026.
 
 ### Fixed 256-token ceiling and truncated generations
 
@@ -228,3 +230,30 @@ changed code and protocol require a new campaign, preserving earlier 256/512-tok
 Tokenizer warning detection matches whole words so configuration keys such as
 `error_on_recompile` do not masquerade as runtime errors. Preflight reports contain log
 line numbers, without exporting raw log lines or credentials.
+
+
+### Final school report evidence
+
+The main returned campaign is `20261008T202221Z-8k`, with 144 measured requests per model.
+Automatic acceptance is Base 104/144, SFT 109/144 and DPO 126/144; raw schema validity is
+144/144, 136/144 and 144/144. The report presents these separately from qualitative safety.
+The original campaign exports remain immutable.
+
+A working review under `outputs/reviews/20261008T202221Z-8k/` contains 144 AI-assisted
+proposals, the source checksum/attribution manifest, and a separate `human_validation.csv`
+with 140 accepted and 4 corrected decisions, all with reviewer/date (14 October 2026).
+The user reviewed the model previews against inputs and bilingual peers. The helper's `review_complete`
+only means rubric cells are filled. It does not establish user approval. All rows are
+validated and `human_validated` is true in the annotation manifest. Incomplete outputs
+remain non-evaluable and all three models have observed contract violations. No professional clinical validation is implied.
+
+Regenerate the working summary after validation without changing measured exports:
+
+```bash
+uv run python scripts/evaluate_model_comparison.py --summarize \
+  --output-dir outputs/evaluations/20261008T202221Z-8k \
+  --review-output-dir outputs/reviews/20261008T202221Z-8k
+```
+
+The final report and 14-slide defence deck include measured results, user-validated review
+examples and deployment evidence, with school completion separated from clinical-pilot gates.
