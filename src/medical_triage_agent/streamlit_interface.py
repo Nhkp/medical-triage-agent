@@ -197,8 +197,8 @@ def _render_triage(result: ApiResult) -> None:
             "arbitration": arbitration,
         }
     )
-    if arbitration == "rule_escalated":
-        st.warning("Backend safety rules overrode a lower LLM priority suggestion.")
+    if arbitration == "llm_priority_mismatch":
+        st.warning("Backend rules retained the priority despite a different LLM suggestion.")
     source = result.data.get("explanation_source", "unknown")
     llm_status = result.data.get("llm_status", "unknown")
     if source == "llm":

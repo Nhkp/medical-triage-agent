@@ -156,7 +156,7 @@ def test_render_triage_warns_when_rules_override_llm(monkeypatch: Any) -> None:
                 "llm_priority": "differee",
                 "llm_confidence": "0.6",
                 "priority_source": "rule",
-                "arbitration": "rule_escalated",
+                "arbitration": "llm_priority_mismatch",
                 "explanation_source": "llm",
                 "llm_status": "accepted",
                 "explanation": "Revue clinique immediate requise.",
@@ -168,7 +168,7 @@ def test_render_triage_warns_when_rules_override_llm(monkeypatch: Any) -> None:
 
     assert (
         "warning",
-        "Backend safety rules overrode a lower LLM priority suggestion.",
+        "Backend rules retained the priority despite a different LLM suggestion.",
     ) in fake.messages
     assert ("code", "audit_test") in fake.messages
 
