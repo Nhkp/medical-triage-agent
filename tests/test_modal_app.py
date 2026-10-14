@@ -25,7 +25,8 @@ def test_modal_vllm_command_serves_default_dpo_adapter() -> None:
         "path": "/app/assets/dpo",
         "base_model_name": "Qwen/Qwen3-1.7B-Base",
     }
-    assert command[command.index("--served-model-name") + 1] == "medical-triage-dpo-8k"
+    assert command[command.index("--served-model-name") + 1] == module.BASE_MODEL
+    assert command[command.index("--dtype") + 1] == "half"
     assert command[command.index("--host") + 1] == "127.0.0.1"
     assert command[command.index("--port") + 1] == "8000"
     assert command[command.index("--max-model-len") + 1] == "4096"

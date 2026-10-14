@@ -2,7 +2,9 @@ services:
   vllm:
     profiles: [gpu]
     image: vllm/vllm-openai:v0.10.2
-    command: ["--model", "${VLLM_MODEL_ID:-Qwen/Qwen3-1.7B-Base}"]
+    command: ["--model", "${VLLM_MODEL_ID:-Qwen/Qwen3-1.7B-Base}", "--revision", "ea980cb0a6c2ae4b936e82123acc929f1cec04c1", "--dtype", "half", "--chat-template", "/app/chat_template.jinja"]
+    volumes:
+      - ./configs/chat_template.jinja:/app/chat_template.jinja:ro
     environment:
       HF_TOKEN: ${HF_TOKEN:-}
     ports:
@@ -24,6 +26,7 @@ services:
       VLLM_STRUCTURED_OUTPUT: ${VLLM_STRUCTURED_OUTPUT:-guided_json}
       VLLM_MAX_TOKENS: ${VLLM_MAX_TOKENS:-256}
       VLLM_TIMEOUT_SECONDS: ${VLLM_TIMEOUT_SECONDS:-30}
+      API_KEY: ${API_KEY:-}
     ports:
       - "8080:8080"
     depends_on:

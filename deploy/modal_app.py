@@ -109,7 +109,7 @@ def build_vllm_command(
             base_model_name=BASE_MODEL,
         ),
         "--served-model-name",
-        served_model_name,
+        BASE_MODEL,
         "--host",
         host,
         "--port",
@@ -120,6 +120,8 @@ def build_vllm_command(
         gpu_memory_utilization,
         "--chat-template",
         chat_template,
+        "--dtype",
+        "half",
         "--tokenizer",
         adapter_repo,
     ]

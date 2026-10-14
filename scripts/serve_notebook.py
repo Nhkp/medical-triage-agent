@@ -64,6 +64,10 @@ def build_commands(args: argparse.Namespace, repo_root: Path) -> dict[str, list[
         "--max-model-len",
         "4096",
         "--enforce-eager",
+        "--dtype",
+        "half",
+        "--chat-template",
+        str(repo_root / "configs/chat_template.jinja"),
     ]
     if adapter:
         vllm_command.extend(

@@ -2,8 +2,11 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      # ponytail: preserve the evaluated template byte-for-byte; qualify a new template before replacement.
       - id: trailing-whitespace
+        exclude: ^configs/chat_template\.jinja$
       - id: end-of-file-fixer
+        exclude: ^configs/chat_template\.jinja$
       - id: check-yaml
       - id: check-toml
       - id: detect-private-key

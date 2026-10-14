@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import argparse
 import importlib.util
+import json
 import sys
 from pathlib import Path
 from typing import Any
 
+from medical_triage_agent.tokenizer_compatibility import checksum
 
-def test_serve_notebook_dry_run_commands_are_colab_friendly() -> None:
+
+def test_serve_notebook_dry_run_uses_qualified_template_and_fp16() -> None:
     module = _load_script("serve_notebook", Path("scripts/serve_notebook.py"))
     args = argparse.Namespace(
         model=None,
@@ -19,9 +22,18 @@ def test_serve_notebook_dry_run_commands_are_colab_friendly() -> None:
         api_port=8080,
     )
 
-    commands = module.build_commands(args, Path("/content/medical-triage-agent"))
+    assert (
+        checksum(Path("configs/chat_template.jinja"))
+        == json.loads(Path("configs/serving.json").read_text())["chat_template_checksum"]
+    )
+
+    commands = module.build_commands(args, Path("/kaggle/working/medical-triage-agent"))
 
     assert commands["vllm"][:3] == [sys.executable, "-m", "vllm.entrypoints.openai.api_server"]
+    assert commands["vllm"][commands["vllm"].index("--dtype") + 1] == "half"
+    assert commands["vllm"][commands["vllm"].index("--chat-template") + 1].endswith(
+        "configs/chat_template.jinja"
+    )
     assert "--model" in commands["vllm"]
     assert "Qwen/Qwen3-1.7B-Base" in commands["vllm"]
     assert "--enable-lora" in commands["vllm"]
