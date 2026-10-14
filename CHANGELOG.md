@@ -4,6 +4,9 @@
 
 ### Changed
 
+- Keep the comparison notebook independent of incidental script imports after
+  sharing tokenizer helpers; verify its helper references before GPU execution.
+
 - Pass the selected input language from Streamlit to the shared API client and
   explicitly mark English operational smoke requests.
 

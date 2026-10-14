@@ -86,3 +86,24 @@ def test_kaggle_training_notebook_supports_tracked_5k_and_8k_experiments() -> No
         assert expected in source
 
     assert "HF_TOKEN =" not in source
+
+
+def test_comparison_notebook_uses_existing_helper_exports() -> None:
+    import ast
+    import importlib
+
+    module = importlib.import_module("scripts.evaluate_model_comparison")
+    notebook = json.loads(Path("notebooks/kaggle_model_comparison.ipynb").read_text())
+    for cell in notebook["cells"]:
+        if cell["cell_type"] != "code":
+            continue
+        source = "".join(cell["source"])
+        if any(line.lstrip().startswith(("!", "%")) for line in source.splitlines()):
+            continue
+        for node in ast.walk(ast.parse(source)):
+            if (
+                isinstance(node, ast.Attribute)
+                and isinstance(node.value, ast.Name)
+                and node.value.id == "comparison"
+            ):
+                assert hasattr(module, node.attr), node.attr
