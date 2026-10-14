@@ -870,6 +870,36 @@ def summarize_campaign(directory: Path, output_directory: Path | None = None) ->
         "recommendation": recommendation,
         "note": "Pedagogical comparison only; human confirmation required before demo selection.",
     }
+    validation_path = destination / "human_validation.csv"
+    if validation_path.exists():
+        with validation_path.open(newline="", encoding="utf-8") as handle:
+            decisions = list(csv.DictReader(handle))
+        keys = {(row["model"], row["id"]) for row in decisions}
+        if len(keys) != len(decisions) or keys != expected_keys:
+            raise ValueError("Human validation rows differ from this campaign")
+        attribution = json.loads((destination / "annotation_manifest.json").read_text())
+        if attribution["source_manifest_sha256"] != checksum(manifest_path):
+            raise ValueError("Human validation belongs to another campaign")
+        approved = complete and all(
+            row["decision"] in {"accepted", "corrected"}
+            and row["reviewer"].strip()
+            and row["reviewed_at"].strip()
+            for row in decisions
+        )
+        result.update(
+            human_validated=approved,
+            user_validation_status="validated" if approved else "pending",
+            recommendation_is_provisional=not approved,
+            annotation_origin=attribution["annotation_origin"],
+            validation_decisions={
+                status: sum(row["decision"] == status for row in decisions)
+                for status in ("accepted", "corrected")
+            },
+        )
+        if approved:
+            result["note"] = (
+                "User-validated pedagogical comparison; not professional clinical validation."
+            )
     _write_json(destination / "review_summary.json", result)
     return result
 

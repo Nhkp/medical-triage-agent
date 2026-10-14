@@ -733,3 +733,44 @@ def test_measured_requests_keep_input_language(monkeypatch: MonkeyPatch) -> None
     for case in cases:
         module._measure_case("http://api.test", case, 1)
     assert sent == [{"symptoms": c.symptoms, "language": c.language} for c in cases]
+
+
+def test_summary_preserves_verified_human_validation(tmp_path: Path) -> None:
+    import csv
+
+    module = _load_script()
+    _campaign(module, tmp_path)
+    module.summarize_campaign(tmp_path)
+    with (tmp_path / "pedagogical_review.csv").open(newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    for row in rows:
+        for criterion in module.REVIEW_CRITERIA:
+            row[criterion] = "non évaluable"
+            row[criterion + "_reason"] = "No model text available"
+    module.write_summary_csv(tmp_path / "pedagogical_review.csv", rows)
+    decisions = [
+        {
+            "model": r["model"],
+            "id": r["id"],
+            "decision": "accepted",
+            "reviewer": "reviewer",
+            "reviewed_at": "2026-10-14",
+        }
+        for r in rows
+    ]
+    module.write_summary_csv(tmp_path / "human_validation.csv", decisions)
+    attribution = {
+        "source_manifest_sha256": module.checksum(tmp_path / "manifest.json"),
+        "annotation_origin": "AI-assisted preannotation, reviewed by user",
+    }
+    module._write_json(tmp_path / "annotation_manifest.json", attribution)
+    result = module.summarize_campaign(tmp_path)
+    assert result["human_validated"] and not result["recommendation_is_provisional"]
+    assert result["validation_decisions"] == {"accepted": 6, "corrected": 0}
+    decisions[0]["decision"] = "pending"
+    module.write_summary_csv(tmp_path / "human_validation.csv", decisions)
+    assert not module.summarize_campaign(tmp_path)["human_validated"]
+    attribution["source_manifest_sha256"] = "another campaign"
+    module._write_json(tmp_path / "annotation_manifest.json", attribution)
+    with raises(ValueError, match="another campaign"):
+        module.summarize_campaign(tmp_path)
